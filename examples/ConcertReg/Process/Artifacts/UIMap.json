@@ -1,0 +1,631 @@
+{
+  "valueDomains": ["Concert", "Registration", "User", "Performer", "Announcement"],
+  "apps": [
+    {
+      "name": "ConcertApp",
+      "filePath": "Apps/ConcertApp.vx",
+      "description": "用户端应用，提供音乐会浏览、报名购票、电子票查看等功能，响应式布局适配移动端和桌面端",
+      "navType": "tabBar",
+      "tabs": [
+        { "label": "音乐会", "icon": "music", "sectionId": "ConcertList" },
+        { "label": "公告", "icon": "notification", "sectionId": "AnnouncementList" },
+        { "label": "我的报名", "icon": "ticket", "sectionId": "MyRegistrations" },
+        { "label": "我的", "icon": "user", "sectionId": "UserProfile" }
+      ],
+      "subPages": [
+        { "sectionId": "ConcertDetail", "from": "ConcertList" },
+        { "sectionId": "SeatSelection", "from": "ConcertDetail" },
+        { "sectionId": "RegistrationConfirm", "from": "SeatSelection" },
+        { "sectionId": "TicketView", "from": "MyRegistrations" }
+      ]
+    },
+    {
+      "name": "ConcertAdmin",
+      "filePath": "Apps/ConcertAdmin.vx",
+      "description": "管理端应用，提供音乐会活动管理、报名管理、数据统计和公告发布功能，侧边栏导航",
+      "navType": "sidebar",
+      "menuItems": [
+        { "label": "管理首页", "icon": "dashboard", "sectionId": "AdminDashboard" },
+        { "label": "音乐会管理", "icon": "music", "sectionId": "ConcertManage" },
+        { "label": "报名管理", "icon": "list", "sectionId": "RegistrationManage" },
+        { "label": "表演者管理", "icon": "team", "sectionId": "PerformerManage" },
+        { "label": "公告管理", "icon": "notification", "sectionId": "AnnouncementManage" },
+        { "label": "数据统计", "icon": "chart", "sectionId": "Statistics" }
+      ],
+      "subPages": [
+        { "sectionId": "ConcertForm", "from": "ConcertManage" }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "name": "ConcertList",
+      "filePath": "Sections/ConcertList.sc",
+      "description": "音乐会列表页，展示所有已发布的露天音乐会，支持搜索、筛选和分页加载",
+      "states": [
+        { "name": "$concertList", "type": "JSON", "default": "[]", "description": "音乐会列表数据" },
+        { "name": "$keyword", "type": "STRING", "default": "", "description": "搜索关键词" },
+        { "name": "$musicType", "type": "STRING", "default": "", "description": "音乐类型筛选" },
+        { "name": "$dateStart", "type": "STRING", "default": "", "description": "日期范围起始" },
+        { "name": "$dateEnd", "type": "STRING", "default": "", "description": "日期范围结束" },
+        { "name": "$priceMin", "type": "STRING", "default": "", "description": "最低票价筛选" },
+        { "name": "$priceMax", "type": "STRING", "default": "", "description": "最高票价筛选" },
+        { "name": "$page", "type": "INT", "default": "1", "description": "当前页码" },
+        { "name": "$pageSize", "type": "INT", "default": "10", "description": "每页条数" },
+        { "name": "$total", "type": "INT", "default": "0", "description": "总记录数" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "false", "description": "加载中状态" },
+        { "name": "$showFilter", "type": "BOOLEAN", "default": "false", "description": "筛选面板是否展开" }
+      ],
+      "services": [
+        { "domain": "ConcertDomain", "method": "listConcerts", "trigger": "onLoad" },
+        { "domain": "ConcertDomain", "method": "searchConcerts", "trigger": "onSearch" }
+      ],
+      "layoutTree": "VStack > [SearchBar(keyword input + filter toggle button), FilterPanel(conditional: musicType picker, dateRange picker, priceRange slider), ScrollView > Grid(responsive: 1col mobile / 2-3col desktop) > ConcertCard[] repeater, LoadMore button / infinite scroll trigger]",
+      "interactions": [
+        "输入关键词回车或点击搜索触发 searchConcerts",
+        "切换筛选条件触发 searchConcerts",
+        "点击音乐会卡片跳转至 ConcertDetail 并传递 concertId",
+        "滚动到底部触发加载更多（page+1）",
+        "下拉刷新重置 page=1 并重新加载"
+      ]
+    },
+    {
+      "name": "ConcertDetail",
+      "filePath": "Sections/ConcertDetail.sc",
+      "description": "音乐会详情页，展示完整信息，包含表演者、座位区域、天气提醒和报名入口",
+      "states": [
+        { "name": "$concertId", "type": "STRING", "default": "", "description": "音乐会ID（路由参数）" },
+        { "name": "$concert", "type": "JSON", "default": "{}", "description": "音乐会详情数据" },
+        { "name": "$performers", "type": "JSON", "default": "[]", "description": "表演者列表" },
+        { "name": "$seatZones", "type": "JSON", "default": "[]", "description": "座位区域列表" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" }
+      ],
+      "services": [
+        { "domain": "ConcertDomain", "method": "getConcertDetail", "trigger": "onLoad" },
+        { "domain": "PerformerDomain", "method": "getPerformersByConcert", "trigger": "onLoad" },
+        { "domain": "ConcertDomain", "method": "getSeatZones", "trigger": "onLoad" }
+      ],
+      "layoutTree": "ScrollView > VStack > [BannerImage(coverImage, full-width), InfoSection(title, datetime, venue, address, musicType badge), WeatherBadge(weatherInfo, weatherTip), Divider, PerformerSection(heading + HStack > PerformerCard[] horizontal scroll), Divider, SeatZonePreview(zone list with name + price + remaining), Divider, DescriptionSection(description rich text), FixedBottom > Button('立即报名' -> SeatSelection)]",
+      "interactions": [
+        "页面加载时根据 concertId 并行获取详情、表演者、座位区域",
+        "点击「立即报名」跳转至 SeatSelection 并传递 concertId",
+        "点击表演者卡片展开简介弹窗",
+        "点击分享按钮触发分享功能"
+      ]
+    },
+    {
+      "name": "SeatSelection",
+      "filePath": "Sections/SeatSelection.sc",
+      "description": "座位区域选择页，可视化展示场地区域，用户选择区域和数量后计算价格",
+      "states": [
+        { "name": "$concertId", "type": "STRING", "default": "", "description": "音乐会ID（路由参数）" },
+        { "name": "$seatZones", "type": "JSON", "default": "[]", "description": "座位区域列表" },
+        { "name": "$selectedZoneId", "type": "STRING", "default": "", "description": "选中的区域ID" },
+        { "name": "$selectedZone", "type": "JSON", "default": "{}", "description": "选中的区域详情" },
+        { "name": "$quantity", "type": "INT", "default": "1", "description": "购票数量（1-5）" },
+        { "name": "$totalPrice", "type": "FLOAT", "default": "0", "description": "计算总价" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" }
+      ],
+      "services": [
+        { "domain": "ConcertDomain", "method": "getSeatZones", "trigger": "onLoad" }
+      ],
+      "layoutTree": "VStack > [PageTitle('选择座位区域'), SeatZoneMap(zones data, selectedZoneId, onSelect callback), SelectedZoneInfo(conditional: zoneName, price, remainingSeats), QuantitySelector(stepper 1-5, disabled if no zone selected), PriceSummary(unitPrice x quantity = totalPrice), FixedBottom > Button('确认选择' -> RegistrationConfirm, disabled if no selection)]",
+      "interactions": [
+        "页面加载时根据 concertId 获取座位区域",
+        "点击 SeatZoneMap 中的区域块选中该区域，更新 selectedZoneId 和 selectedZone",
+        "调整数量触发 totalPrice 重新计算 (selectedZone.price × quantity)",
+        "点击「确认选择」跳转至 RegistrationConfirm 并传递 concertId, zoneId, quantity, totalPrice"
+      ]
+    },
+    {
+      "name": "RegistrationConfirm",
+      "filePath": "Sections/RegistrationConfirm.sc",
+      "description": "报名确认页，展示订单摘要、填写联系方式并提交报名",
+      "states": [
+        { "name": "$concertId", "type": "STRING", "default": "", "description": "音乐会ID（路由参数）" },
+        { "name": "$zoneId", "type": "STRING", "default": "", "description": "座位区域ID（路由参数）" },
+        { "name": "$quantity", "type": "INT", "default": "1", "description": "购票数量（路由参数）" },
+        { "name": "$totalPrice", "type": "FLOAT", "default": "0", "description": "总金额（路由参数）" },
+        { "name": "$concertTitle", "type": "STRING", "default": "", "description": "音乐会名称（路由参数展示用）" },
+        { "name": "$zoneName", "type": "STRING", "default": "", "description": "区域名称（路由参数展示用）" },
+        { "name": "$contactName", "type": "STRING", "default": "", "description": "联系人姓名" },
+        { "name": "$contactPhone", "type": "STRING", "default": "", "description": "联系人手机号" },
+        { "name": "$contactEmail", "type": "STRING", "default": "", "description": "联系人邮箱" },
+        { "name": "$submitting", "type": "BOOLEAN", "default": "false", "description": "提交中状态" },
+        { "name": "$submitSuccess", "type": "BOOLEAN", "default": "false", "description": "提交成功状态" },
+        { "name": "$registrationResult", "type": "JSON", "default": "{}", "description": "提交成功后的报名结果" }
+      ],
+      "services": [
+        { "domain": "RegistrationDomain", "method": "createRegistration", "trigger": "onSubmit" }
+      ],
+      "layoutTree": "ScrollView > VStack > [OrderSummary Card(concertTitle, zoneName, quantity, totalPrice), ContactForm(nameInput, phoneInput, emailInput with validation), TipsSection(露天活动注意事项, 退票规则), SubmitButton('确认报名'), SuccessModal(conditional: ticketCode preview, navigate buttons)]",
+      "interactions": [
+        "填写联系人表单，实时校验手机号格式",
+        "点击「确认报名」调用 createRegistration，传递 userId/concertId/zoneId/quantity/totalPrice/contact信息",
+        "提交成功后显示成功弹窗，展示电子票编码预览",
+        "成功弹窗中点击「查看电子票」跳转至 TicketView",
+        "成功弹窗中点击「我的报名」跳转至 MyRegistrations"
+      ]
+    },
+    {
+      "name": "MyRegistrations",
+      "filePath": "Sections/MyRegistrations.sc",
+      "description": "我的报名列表页，展示用户所有报名记录，支持按状态筛选、取消报名和查看电子票",
+      "states": [
+        { "name": "$registrationList", "type": "JSON", "default": "[]", "description": "报名记录列表" },
+        { "name": "$activeTab", "type": "STRING", "default": "upcoming", "description": "当前标签页：upcoming/history" },
+        { "name": "$statusFilter", "type": "STRING", "default": "", "description": "状态筛选：confirmed/cancelled/used" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" },
+        { "name": "$cancellingId", "type": "STRING", "default": "", "description": "正在取消的报名记录ID" },
+        { "name": "$showCancelConfirm", "type": "BOOLEAN", "default": "false", "description": "取消确认弹窗" }
+      ],
+      "services": [
+        { "domain": "RegistrationDomain", "method": "getMyRegistrations", "trigger": "onLoad" },
+        { "domain": "RegistrationDomain", "method": "cancelRegistration", "trigger": "onCancel" }
+      ],
+      "layoutTree": "VStack > [TabBar(upcoming: '即将参加', history: '历史记录'), ScrollView > List > RegistrationItem[](concertTitle, dateTime, zoneName, quantity, StatusTag, action buttons), EmptyState(conditional: illustration + '暂无报名记录' + navigate button), CancelConfirmDialog(modal)]",
+      "interactions": [
+        "页面加载时获取当前用户报名记录",
+        "切换 Tab 标签筛选即将参加/历史记录",
+        "点击报名记录查看电子票，跳转至 TicketView 传递 registrationId",
+        "点击取消报名弹出确认对话框",
+        "确认取消调用 cancelRegistration 后刷新列表",
+        "空状态下点击引导按钮跳转至 ConcertList"
+      ]
+    },
+    {
+      "name": "TicketView",
+      "filePath": "Sections/TicketView.sc",
+      "description": "电子票详情页，展示二维码和票面信息，包含天气穿衣建议",
+      "states": [
+        { "name": "$registrationId", "type": "STRING", "default": "", "description": "报名记录ID（路由参数）" },
+        { "name": "$ticketDetail", "type": "JSON", "default": "{}", "description": "电子票详情数据" },
+        { "name": "$concertTitle", "type": "STRING", "default": "", "description": "音乐会名称" },
+        { "name": "$concertStartTime", "type": "STRING", "default": "", "description": "演出开始时间" },
+        { "name": "$concertVenue", "type": "STRING", "default": "", "description": "演出场地" },
+        { "name": "$concertAddress", "type": "STRING", "default": "", "description": "场地地址" },
+        { "name": "$zoneName", "type": "STRING", "default": "", "description": "座位区域名称" },
+        { "name": "$ticketCode", "type": "STRING", "default": "", "description": "电子票编码" },
+        { "name": "$weatherInfo", "type": "STRING", "default": "", "description": "天气预报信息" },
+        { "name": "$weatherTip", "type": "STRING", "default": "", "description": "天气穿衣建议" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" }
+      ],
+      "services": [
+        { "domain": "RegistrationDomain", "method": "getTicketDetail", "trigger": "onLoad" }
+      ],
+      "layoutTree": "ScrollView > VStack(ticket-card style) > [TicketHeader(concertTitle, StatusTag), TicketQrCode(ticketCode, large centered), TicketInfo(startTime, venue, address, zoneName, quantity), Divider(dashed), WeatherSection(WeatherBadge + weatherTip text), Divider(dashed), NoticeSection(入场须知 list items), SaveButton('保存至相册')]",
+      "interactions": [
+        "页面加载时根据 registrationId 获取电子票详情",
+        "二维码区域支持长按保存",
+        "点击「保存至相册」将票面截图保存到手机相册"
+      ]
+    },
+    {
+      "name": "AnnouncementList",
+      "filePath": "Sections/AnnouncementList.sc",
+      "description": "公告通知列表页，展示已发布的公告，紧急公告置顶高亮",
+      "states": [
+        { "name": "$announcementList", "type": "JSON", "default": "[]", "description": "公告列表数据" },
+        { "name": "$page", "type": "INT", "default": "1", "description": "当前页码" },
+        { "name": "$pageSize", "type": "INT", "default": "20", "description": "每页条数" },
+        { "name": "$total", "type": "INT", "default": "0", "description": "总记录数" },
+        { "name": "$expandedId", "type": "STRING", "default": "", "description": "当前展开查看全文的公告ID" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" }
+      ],
+      "services": [
+        { "domain": "AnnouncementDomain", "method": "listAnnouncements", "trigger": "onLoad" }
+      ],
+      "layoutTree": "VStack > [PageTitle('公告通知'), ScrollView > List > AnnouncementItem[](urgentBadge conditional, title, publishedAt, content preview / expanded full text, expand/collapse toggle), LoadMore, EmptyState(conditional: '暂无公告')]",
+      "interactions": [
+        "页面加载时获取已发布公告列表",
+        "紧急公告自动置顶并显示红色高亮标记",
+        "点击公告标题展开/收起全文内容",
+        "滚动到底部加载更多"
+      ]
+    },
+    {
+      "name": "UserProfile",
+      "filePath": "Sections/UserProfile.sc",
+      "description": "个人中心页，展示用户信息、编辑资料和快捷入口",
+      "states": [
+        { "name": "$userProfile", "type": "JSON", "default": "{}", "description": "用户信息数据" },
+        { "name": "$editing", "type": "BOOLEAN", "default": "false", "description": "是否处于编辑模式" },
+        { "name": "$nickname", "type": "STRING", "default": "", "description": "编辑中的昵称" },
+        { "name": "$realName", "type": "STRING", "default": "", "description": "编辑中的真实姓名" },
+        { "name": "$phone", "type": "STRING", "default": "", "description": "编辑中的手机号" },
+        { "name": "$email", "type": "STRING", "default": "", "description": "编辑中的邮箱" },
+        { "name": "$avatarUrl", "type": "STRING", "default": "", "description": "编辑中的头像URL" },
+        { "name": "$saving", "type": "BOOLEAN", "default": "false", "description": "保存中状态" },
+        { "name": "$registrationCount", "type": "INT", "default": "0", "description": "报名次数统计" }
+      ],
+      "services": [
+        { "domain": "UserDomain", "method": "getUserProfile", "trigger": "onLoad" },
+        { "domain": "UserDomain", "method": "updateUserProfile", "trigger": "onSave" }
+      ],
+      "layoutTree": "ScrollView > VStack > [AvatarSection(avatar large circle, nickname, tap to change avatar), StatsBar(registrationCount, 快捷入口), Divider, InfoSection(display mode: realName/phone/email rows | edit mode: input fields), EditButton('编辑资料' toggle) / SaveButton('保存'), MenuList(消息通知设置, 关于与帮助)]",
+      "interactions": [
+        "页面加载时获取用户信息",
+        "点击头像触发头像上传/更换",
+        "点击「编辑资料」切换为编辑模式，表单填入当前值",
+        "编辑模式点击「保存」调用 updateUserProfile",
+        "点击报名次数快捷入口跳转至 MyRegistrations"
+      ]
+    },
+    {
+      "name": "AdminDashboard",
+      "filePath": "Sections/AdminDashboard.sc",
+      "description": "管理端首页仪表盘，展示统计数据卡片、近期音乐会和最新报名动态",
+      "states": [
+        { "name": "$dashboardStats", "type": "JSON", "default": "{}", "description": "仪表盘统计数据" },
+        { "name": "$totalConcerts", "type": "INT", "default": "0", "description": "总音乐会数量" },
+        { "name": "$totalRegistrations", "type": "INT", "default": "0", "description": "总报名人数" },
+        { "name": "$monthlyRevenue", "type": "FLOAT", "default": "0", "description": "本月总收入" },
+        { "name": "$upcomingCount", "type": "INT", "default": "0", "description": "待举办音乐会数量" },
+        { "name": "$upcomingConcerts", "type": "JSON", "default": "[]", "description": "近期音乐会列表" },
+        { "name": "$recentRegistrations", "type": "JSON", "default": "[]", "description": "最新报名动态列表" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" }
+      ],
+      "services": [
+        { "domain": "ConcertDomain", "method": "getDashboardStats", "trigger": "onLoad" },
+        { "domain": "ConcertDomain", "method": "getUpcomingConcerts", "trigger": "onLoad" },
+        { "domain": "RegistrationDomain", "method": "getRecentRegistrations", "trigger": "onLoad" }
+      ],
+      "layoutTree": "ScrollView > VStack > [StatsGrid(responsive 2x2 / 4x1) > StatCard[](totalConcerts, totalRegistrations, monthlyRevenue, upcomingCount), QuickActions(HStack: '创建音乐会' button, '发布公告' button), UpcomingSection(heading + List > ConcertRow[](title, date, venue, progress bar registrationCount/totalCapacity)), RecentRegistrations(heading + Timeline > RegistrationItem[](username, concertTitle, time))]",
+      "interactions": [
+        "页面加载时并行获取统计数据、近期音乐会、最新报名动态",
+        "点击「创建音乐会」跳转至 ConcertForm（新建模式）",
+        "点击「发布公告」跳转至 AnnouncementManage",
+        "点击近期音乐会行跳转至 ConcertForm（编辑模式）",
+        "点击报名动态行跳转至 RegistrationManage"
+      ]
+    },
+    {
+      "name": "ConcertManage",
+      "filePath": "Sections/ConcertManage.sc",
+      "description": "音乐会管理列表页，数据表格展示所有音乐会，支持筛选、搜索和CRUD操作",
+      "states": [
+        { "name": "$concertList", "type": "JSON", "default": "[]", "description": "音乐会列表数据" },
+        { "name": "$keyword", "type": "STRING", "default": "", "description": "搜索关键词" },
+        { "name": "$statusFilter", "type": "STRING", "default": "", "description": "状态筛选：draft/published/cancelled/finished" },
+        { "name": "$page", "type": "INT", "default": "1", "description": "当前页码" },
+        { "name": "$pageSize", "type": "INT", "default": "20", "description": "每页条数" },
+        { "name": "$total", "type": "INT", "default": "0", "description": "总记录数" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" },
+        { "name": "$selectedIds", "type": "JSON", "default": "[]", "description": "批量选中的音乐会ID列表" },
+        { "name": "$showDeleteConfirm", "type": "BOOLEAN", "default": "false", "description": "删除确认弹窗" },
+        { "name": "$deletingId", "type": "STRING", "default": "", "description": "待删除的音乐会ID" }
+      ],
+      "services": [
+        { "domain": "ConcertDomain", "method": "listAllConcerts", "trigger": "onLoad" },
+        { "domain": "ConcertDomain", "method": "deleteConcert", "trigger": "onDelete" },
+        { "domain": "ConcertDomain", "method": "updateConcertStatus", "trigger": "onStatusChange" }
+      ],
+      "layoutTree": "VStack > [Toolbar(HStack: searchInput, statusFilter dropdown, 'New Concert' button), DataTable(columns: checkbox, title, musicType, venue, startTime, status(StatusTag), registrationCount, actions(edit/delete/publish buttons), pagination), DeleteConfirmDialog(modal), BatchActionBar(conditional: publish/delete batch buttons)]",
+      "interactions": [
+        "页面加载时获取所有音乐会列表",
+        "输入关键词筛选搜索",
+        "切换状态下拉筛选",
+        "点击「新建音乐会」跳转至 ConcertForm（新建模式）",
+        "点击编辑按钮跳转至 ConcertForm（编辑模式，传递 concertId）",
+        "点击删除按钮弹出确认对话框，确认后调用 deleteConcert",
+        "点击发布/取消按钮调用 updateConcertStatus",
+        "勾选多条记录后显示批量操作栏",
+        "翻页触发 listAllConcerts 重新加载"
+      ]
+    },
+    {
+      "name": "ConcertForm",
+      "filePath": "Sections/ConcertForm.sc",
+      "description": "音乐会创建/编辑表单页，包含基本信息、时间地点、座位区域配置和表演者关联",
+      "states": [
+        { "name": "$concertId", "type": "STRING", "default": "", "description": "音乐会ID（编辑模式路由参数，为空则新建）" },
+        { "name": "$isEdit", "type": "BOOLEAN", "default": "false", "description": "是否编辑模式" },
+        { "name": "$title", "type": "STRING", "default": "", "description": "音乐会名称" },
+        { "name": "$description", "type": "STRING", "default": "", "description": "音乐会描述" },
+        { "name": "$coverImage", "type": "STRING", "default": "", "description": "封面图片URL" },
+        { "name": "$musicType", "type": "STRING", "default": "", "description": "音乐类型" },
+        { "name": "$venue", "type": "STRING", "default": "", "description": "场地名称" },
+        { "name": "$address", "type": "STRING", "default": "", "description": "场地地址" },
+        { "name": "$startTime", "type": "STRING", "default": "", "description": "开始时间" },
+        { "name": "$endTime", "type": "STRING", "default": "", "description": "结束时间" },
+        { "name": "$gateOpenTime", "type": "STRING", "default": "", "description": "入场时间" },
+        { "name": "$seatZones", "type": "JSON", "default": "[]", "description": "座位区域配置列表" },
+        { "name": "$performerList", "type": "JSON", "default": "[]", "description": "可选表演者列表" },
+        { "name": "$selectedPerformers", "type": "JSON", "default": "[]", "description": "已选表演者ID列表" },
+        { "name": "$saving", "type": "BOOLEAN", "default": "false", "description": "保存中状态" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" },
+        { "name": "$formErrors", "type": "JSON", "default": "{}", "description": "表单校验错误信息" }
+      ],
+      "services": [
+        { "domain": "ConcertDomain", "method": "getConcertDetail", "trigger": "onLoad (edit mode)" },
+        { "domain": "ConcertDomain", "method": "createConcert", "trigger": "onSubmit (create mode)" },
+        { "domain": "ConcertDomain", "method": "updateConcert", "trigger": "onSubmit (edit mode)" },
+        { "domain": "PerformerDomain", "method": "listPerformers", "trigger": "onLoad" },
+        { "domain": "ConcertDomain", "method": "saveSeatZones", "trigger": "onSubmit (after concert saved)" }
+      ],
+      "layoutTree": "ScrollView > Form > VStack > [BasicInfoSection(titleInput, descriptionTextarea, musicTypePicker, coverImageUpload), TimeSection(startTimePicker, endTimePicker, gateOpenTimePicker), VenueSection(venueInput, addressInput), SeatZoneSection(dynamic list: zoneName/capacity/price inputs + add/remove zone buttons), PerformerSection(performer multi-select from performerList, sortable selected list), ActionBar(HStack: 'Save Draft' button, 'Publish' button, 'Cancel' button)]",
+      "interactions": [
+        "编辑模式下页面加载时获取音乐会详情并填充表单",
+        "页面加载时获取表演者列表用于选择",
+        "动态添加/删除座位区域行",
+        "表单校验：名称、音乐类型、场地、时间为必填",
+        "点击「保存草稿」调用 createConcert/updateConcert (status=draft)，然后调用 saveSeatZones",
+        "点击「发布」先保存再调用 updateConcertStatus(published)",
+        "保存成功后跳转回 ConcertManage"
+      ]
+    },
+    {
+      "name": "RegistrationManage",
+      "filePath": "Sections/RegistrationManage.sc",
+      "description": "报名管理列表页，展示所有报名记录，支持按音乐会/状态筛选、搜索和导出",
+      "states": [
+        { "name": "$registrationList", "type": "JSON", "default": "[]", "description": "报名记录列表" },
+        { "name": "$concertIdFilter", "type": "STRING", "default": "", "description": "按音乐会筛选" },
+        { "name": "$statusFilter", "type": "STRING", "default": "", "description": "状态筛选：confirmed/cancelled/used" },
+        { "name": "$keyword", "type": "STRING", "default": "", "description": "搜索关键词（姓名或手机号）" },
+        { "name": "$page", "type": "INT", "default": "1", "description": "当前页码" },
+        { "name": "$pageSize", "type": "INT", "default": "20", "description": "每页条数" },
+        { "name": "$total", "type": "INT", "default": "0", "description": "总记录数" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" },
+        { "name": "$exporting", "type": "BOOLEAN", "default": "false", "description": "导出中状态" }
+      ],
+      "services": [
+        { "domain": "RegistrationDomain", "method": "listAllRegistrations", "trigger": "onLoad" },
+        { "domain": "RegistrationDomain", "method": "cancelRegistration", "trigger": "onCancel" },
+        { "domain": "RegistrationDomain", "method": "exportRegistrations", "trigger": "onExport" }
+      ],
+      "layoutTree": "VStack > [Toolbar(HStack: searchInput, concertIdFilter dropdown, statusFilter dropdown, 'Export' button), DataTable(columns: contactName, contactPhone, concertTitle, zoneName, quantity, totalPrice, status(StatusTag), createdAt, actions(cancel button), pagination)]",
+      "interactions": [
+        "页面加载时获取所有报名记录",
+        "切换音乐会/状态下拉筛选",
+        "输入关键词搜索报名者",
+        "点击取消按钮调用 cancelRegistration 后刷新列表",
+        "点击导出按钮调用 exportRegistrations 下载文件",
+        "翻页触发 listAllRegistrations 重新加载"
+      ]
+    },
+    {
+      "name": "PerformerManage",
+      "filePath": "Sections/PerformerManage.sc",
+      "description": "表演者管理页，展示表演者列表，支持新增、编辑和删除表演者",
+      "states": [
+        { "name": "$performerList", "type": "JSON", "default": "[]", "description": "表演者列表数据" },
+        { "name": "$keyword", "type": "STRING", "default": "", "description": "搜索关键词" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" },
+        { "name": "$showFormModal", "type": "BOOLEAN", "default": "false", "description": "新增/编辑表单弹窗" },
+        { "name": "$editingPerformer", "type": "JSON", "default": "{}", "description": "当前编辑的表演者数据" },
+        { "name": "$formName", "type": "STRING", "default": "", "description": "表单：表演者姓名" },
+        { "name": "$formAvatarUrl", "type": "STRING", "default": "", "description": "表单：头像URL" },
+        { "name": "$formBio", "type": "STRING", "default": "", "description": "表单：简介" },
+        { "name": "$formGenre", "type": "STRING", "default": "", "description": "表单：风格标签" },
+        { "name": "$formRepresentative", "type": "STRING", "default": "", "description": "表单：代表作品" },
+        { "name": "$saving", "type": "BOOLEAN", "default": "false", "description": "保存中状态" },
+        { "name": "$showDeleteConfirm", "type": "BOOLEAN", "default": "false", "description": "删除确认弹窗" },
+        { "name": "$deletingId", "type": "STRING", "default": "", "description": "待删除的表演者ID" }
+      ],
+      "services": [
+        { "domain": "PerformerDomain", "method": "listPerformers", "trigger": "onLoad" },
+        { "domain": "PerformerDomain", "method": "createPerformer", "trigger": "onCreate" },
+        { "domain": "PerformerDomain", "method": "updatePerformer", "trigger": "onUpdate" },
+        { "domain": "PerformerDomain", "method": "deletePerformer", "trigger": "onDelete" }
+      ],
+      "layoutTree": "VStack > [Toolbar(HStack: searchInput, 'New Performer' button), CardGrid(responsive) > PerformerCard[](avatar, name, genre, bio snippet, edit/delete action buttons), FormModal(nameInput, avatarUpload, bioTextarea, genrePicker, representativeInput, save/cancel buttons), DeleteConfirmDialog(modal)]",
+      "interactions": [
+        "页面加载时获取表演者列表",
+        "输入关键词搜索表演者",
+        "点击「新增表演者」打开空表单弹窗",
+        "点击编辑按钮打开表单弹窗并填充数据",
+        "表单保存调用 createPerformer 或 updatePerformer 后关闭弹窗并刷新列表",
+        "点击删除按钮弹出确认对话框，确认后调用 deletePerformer"
+      ]
+    },
+    {
+      "name": "AnnouncementManage",
+      "filePath": "Sections/AnnouncementManage.sc",
+      "description": "公告管理页，展示所有公告列表，支持新增、编辑、删除和发布/撤回操作",
+      "states": [
+        { "name": "$announcementList", "type": "JSON", "default": "[]", "description": "公告列表数据" },
+        { "name": "$keyword", "type": "STRING", "default": "", "description": "搜索关键词" },
+        { "name": "$statusFilter", "type": "STRING", "default": "", "description": "状态筛选：draft/published/withdrawn" },
+        { "name": "$page", "type": "INT", "default": "1", "description": "当前页码" },
+        { "name": "$pageSize", "type": "INT", "default": "20", "description": "每页条数" },
+        { "name": "$total", "type": "INT", "default": "0", "description": "总记录数" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" },
+        { "name": "$showFormModal", "type": "BOOLEAN", "default": "false", "description": "新增/编辑表单弹窗" },
+        { "name": "$editingAnnouncement", "type": "JSON", "default": "{}", "description": "当前编辑的公告数据" },
+        { "name": "$formTitle", "type": "STRING", "default": "", "description": "表单：公告标题" },
+        { "name": "$formContent", "type": "STRING", "default": "", "description": "表单：公告内容" },
+        { "name": "$formType", "type": "STRING", "default": "normal", "description": "表单：类型 normal/urgent" },
+        { "name": "$formConcertId", "type": "STRING", "default": "", "description": "表单：关联音乐会ID" },
+        { "name": "$saving", "type": "BOOLEAN", "default": "false", "description": "保存中状态" },
+        { "name": "$showDeleteConfirm", "type": "BOOLEAN", "default": "false", "description": "删除确认弹窗" },
+        { "name": "$deletingId", "type": "STRING", "default": "", "description": "待删除的公告ID" }
+      ],
+      "services": [
+        { "domain": "AnnouncementDomain", "method": "listAllAnnouncements", "trigger": "onLoad" },
+        { "domain": "AnnouncementDomain", "method": "createAnnouncement", "trigger": "onCreate" },
+        { "domain": "AnnouncementDomain", "method": "updateAnnouncement", "trigger": "onUpdate" },
+        { "domain": "AnnouncementDomain", "method": "deleteAnnouncement", "trigger": "onDelete" },
+        { "domain": "AnnouncementDomain", "method": "togglePublish", "trigger": "onTogglePublish" }
+      ],
+      "layoutTree": "VStack > [Toolbar(HStack: searchInput, statusFilter dropdown, 'New Announcement' button), DataTable(columns: title, concertTitle, type(StatusTag), status(StatusTag), publishedAt, createdAt, actions(edit/delete/publish/withdraw buttons), pagination), FormModal(titleInput, contentTextarea, typePicker(normal/urgent), concertIdDropdown, save/cancel buttons), DeleteConfirmDialog(modal)]",
+      "interactions": [
+        "页面加载时获取所有公告列表",
+        "输入关键词搜索/状态筛选",
+        "点击「新建公告」打开空表单弹窗",
+        "点击编辑按钮打开表单弹窗并填充数据",
+        "表单保存调用 createAnnouncement 或 updateAnnouncement 后刷新列表",
+        "点击发布按钮调用 togglePublish(action=publish)",
+        "点击撤回按钮调用 togglePublish(action=withdraw)",
+        "点击删除按钮弹出确认对话框，确认后调用 deleteAnnouncement"
+      ]
+    },
+    {
+      "name": "Statistics",
+      "filePath": "Sections/Statistics.sc",
+      "description": "数据统计页，图表可视化展示报名趋势、各音乐会统计、区域偏好和收入汇总",
+      "states": [
+        { "name": "$trendData", "type": "JSON", "default": "[]", "description": "报名趋势数据（折线图）" },
+        { "name": "$concertStats", "type": "JSON", "default": "[]", "description": "各音乐会报名统计（柱状图）" },
+        { "name": "$zoneDistribution", "type": "JSON", "default": "[]", "description": "座位区域偏好分布（饼图）" },
+        { "name": "$revenueStats", "type": "JSON", "default": "{}", "description": "收入统计汇总" },
+        { "name": "$totalRevenue", "type": "FLOAT", "default": "0", "description": "总收入" },
+        { "name": "$totalOrders", "type": "INT", "default": "0", "description": "总订单数" },
+        { "name": "$totalTickets", "type": "INT", "default": "0", "description": "总票数" },
+        { "name": "$averageOrderPrice", "type": "FLOAT", "default": "0", "description": "平均订单金额" },
+        { "name": "$revenueByMonth", "type": "JSON", "default": "[]", "description": "按月收入数据" },
+        { "name": "$trendPeriod", "type": "STRING", "default": "day", "description": "趋势周期：day/week/month" },
+        { "name": "$dateStart", "type": "STRING", "default": "", "description": "统计起始日期" },
+        { "name": "$dateEnd", "type": "STRING", "default": "", "description": "统计结束日期" },
+        { "name": "$loading", "type": "BOOLEAN", "default": "true", "description": "加载中状态" }
+      ],
+      "services": [
+        { "domain": "RegistrationDomain", "method": "getRegistrationTrend", "trigger": "onLoad" },
+        { "domain": "RegistrationDomain", "method": "getRegistrationByConcert", "trigger": "onLoad" },
+        { "domain": "RegistrationDomain", "method": "getZoneDistribution", "trigger": "onLoad" },
+        { "domain": "RegistrationDomain", "method": "getRevenueStats", "trigger": "onLoad" }
+      ],
+      "layoutTree": "ScrollView > VStack > [DateRangeBar(dateStart picker, dateEnd picker, apply button), RevenueOverview(Grid: StatCard[](totalRevenue, totalOrders, totalTickets, averageOrderPrice)), TrendChart(periodToggle(day/week/month), LineChart with trendData), ConcertBarChart(BarChart with concertStats: concertTitle vs registrationCount), ZonePieChart(PieChart with zoneDistribution: zoneName vs count/percentage), RevenueMonthChart(BarChart with revenueByMonth: month vs revenue)]",
+      "interactions": [
+        "页面加载时并行获取所有统计数据",
+        "切换趋势周期（日/周/月）触发 getRegistrationTrend 重新加载",
+        "修改日期范围触发所有统计接口重新加载",
+        "图表支持 hover 显示详细数值",
+        "点击柱状图中的音乐会可跳转至对应 ConcertManage 详情"
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "ConcertCard",
+      "filePath": "ExtComponents/ConcertCard.cp",
+      "description": "音乐会卡片组件，用于列表中展示音乐会概览信息，包含封面图、标题、时间、地点、票价范围和天气图标",
+      "props": [
+        { "name": "title", "type": "STRING", "description": "音乐会名称" },
+        { "name": "coverImage", "type": "STRING", "description": "封面海报图片URL" },
+        { "name": "dateText", "type": "STRING", "description": "演出日期时间文本" },
+        { "name": "venue", "type": "STRING", "description": "场地名称" },
+        { "name": "musicType", "type": "STRING", "description": "音乐类型标签" },
+        { "name": "priceRange", "type": "STRING", "description": "票价范围文本（如 ¥80-¥380）" },
+        { "name": "weatherIcon", "type": "STRING", "description": "天气图标标识（sunny/cloudy/rainy等）" },
+        { "name": "weatherTemp", "type": "STRING", "description": "温度文本" },
+        { "name": "registrationCount", "type": "INT", "description": "已报名人数" },
+        { "name": "totalCapacity", "type": "INT", "description": "总容量" }
+      ],
+      "events": [
+        { "name": "@tap", "description": "点击卡片，跳转至音乐会详情" }
+      ]
+    },
+    {
+      "name": "PerformerCard",
+      "filePath": "ExtComponents/PerformerCard.cp",
+      "description": "表演者卡片组件，展示表演者头像、姓名、风格标签和简介摘要",
+      "props": [
+        { "name": "name", "type": "STRING", "description": "表演者姓名/乐队名" },
+        { "name": "avatarUrl", "type": "STRING", "description": "表演者头像URL" },
+        { "name": "genre", "type": "STRING", "description": "风格标签" },
+        { "name": "bio", "type": "STRING", "description": "简介文本" },
+        { "name": "representative", "type": "STRING", "description": "代表作品" },
+        { "name": "showActions", "type": "BOOLEAN", "description": "是否显示编辑/删除操作按钮（管理端使用）" }
+      ],
+      "events": [
+        { "name": "@tap", "description": "点击卡片，查看表演者详情" },
+        { "name": "@edit", "description": "点击编辑按钮" },
+        { "name": "@delete", "description": "点击删除按钮" }
+      ]
+    },
+    {
+      "name": "SeatZoneMap",
+      "filePath": "ExtComponents/SeatZoneMap.cp",
+      "description": "座位区域可视化地图组件，以色块形式展示场地各区域，显示剩余座位数和价格，支持点击选择",
+      "props": [
+        { "name": "zones", "type": "JSON", "description": "座位区域列表数据（zoneName, capacity, remainingSeats, price, sortOrder）" },
+        { "name": "selectedZoneId", "type": "STRING", "description": "当前选中的区域ID" },
+        { "name": "disabled", "type": "BOOLEAN", "description": "是否禁用选择（仅展示模式）" }
+      ],
+      "events": [
+        { "name": "@selectZone", "description": "点击选择某个区域，携带 zoneId" }
+      ]
+    },
+    {
+      "name": "TicketQrCode",
+      "filePath": "ExtComponents/TicketQrCode.cp",
+      "description": "电子票二维码组件，生成并展示二维码及票面基本信息",
+      "props": [
+        { "name": "ticketCode", "type": "STRING", "description": "电子票编码（用于生成二维码）" },
+        { "name": "concertTitle", "type": "STRING", "description": "音乐会名称" },
+        { "name": "dateText", "type": "STRING", "description": "演出日期时间" },
+        { "name": "venue", "type": "STRING", "description": "场地名称" },
+        { "name": "zoneName", "type": "STRING", "description": "座位区域名称" },
+        { "name": "quantity", "type": "INT", "description": "票数" },
+        { "name": "status", "type": "STRING", "description": "票状态：confirmed/cancelled/used" }
+      ],
+      "events": [
+        { "name": "@save", "description": "点击保存至相册" }
+      ]
+    },
+    {
+      "name": "StatCard",
+      "filePath": "ExtComponents/StatCard.cp",
+      "description": "统计数据卡片组件，用于仪表盘展示关键指标，带图标、标题、数值和趋势指示",
+      "props": [
+        { "name": "icon", "type": "STRING", "description": "图标标识" },
+        { "name": "title", "type": "STRING", "description": "指标标题" },
+        { "name": "value", "type": "STRING", "description": "指标数值（格式化后的文本）" },
+        { "name": "unit", "type": "STRING", "description": "数值单位（如 '场'、'人'、'元'）" },
+        { "name": "trend", "type": "STRING", "description": "趋势方向：up/down/flat" },
+        { "name": "trendValue", "type": "STRING", "description": "趋势变化值（如 '+12%'）" },
+        { "name": "bgColor", "type": "STRING", "description": "卡片背景色主题" }
+      ],
+      "events": [
+        { "name": "@tap", "description": "点击卡片，可跳转至对应详情页" }
+      ]
+    },
+    {
+      "name": "DataTable",
+      "filePath": "ExtComponents/DataTable.cp",
+      "description": "通用数据表格组件，支持列配置、行数据、操作按钮、分页和多选",
+      "props": [
+        { "name": "columns", "type": "JSON", "description": "列定义数组（key, label, width, sortable, render type）" },
+        { "name": "rows", "type": "JSON", "description": "行数据数组" },
+        { "name": "actions", "type": "JSON", "description": "操作按钮定义数组（label, type, handler name）" },
+        { "name": "page", "type": "INT", "description": "当前页码" },
+        { "name": "pageSize", "type": "INT", "description": "每页条数" },
+        { "name": "total", "type": "INT", "description": "总记录数" },
+        { "name": "selectable", "type": "BOOLEAN", "description": "是否显示多选列" },
+        { "name": "loading", "type": "BOOLEAN", "description": "加载中状态" }
+      ],
+      "events": [
+        { "name": "@action", "description": "点击操作按钮，携带 actionType 和 row 数据" },
+        { "name": "@pageChange", "description": "翻页，携带新 page 值" },
+        { "name": "@selectionChange", "description": "多选变更，携带选中的行ID数组" },
+        { "name": "@sort", "description": "点击列排序，携带 columnKey 和 sortOrder" }
+      ]
+    },
+    {
+      "name": "StatusTag",
+      "filePath": "ExtComponents/StatusTag.cp",
+      "description": "状态标签组件，以不同颜色标签展示各类状态文本",
+      "props": [
+        { "name": "text", "type": "STRING", "description": "状态文本" },
+        { "name": "colorType", "type": "STRING", "description": "颜色类型：success/warning/danger/info/default" }
+      ],
+      "events": []
+    },
+    {
+      "name": "WeatherBadge",
+      "filePath": "ExtComponents/WeatherBadge.cp",
+      "description": "天气小图标徽章组件，紧凑展示天气图标和温度信息",
+      "props": [
+        { "name": "weatherIcon", "type": "STRING", "description": "天气图标标识（sunny/cloudy/rainy/snowy/windy）" },
+        { "name": "temperature", "type": "STRING", "description": "温度文本（如 '25°C'）" },
+        { "name": "description", "type": "STRING", "description": "天气描述文本（如 '晴朗'）" },
+        { "name": "showTip", "type": "BOOLEAN", "description": "是否显示穿衣建议提示" },
+        { "name": "tip", "type": "STRING", "description": "穿衣/出行建议文本" }
+      ],
+      "events": [
+        { "name": "@tap", "description": "点击查看天气详情" }
+      ]
+    }
+  ]
+}

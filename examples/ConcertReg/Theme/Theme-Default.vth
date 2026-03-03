@@ -1,0 +1,79 @@
+// VL_VERSION:2.91
+
+# Theme Tokens
+
+--colorBrandPrimary: #6366f1
+--colorBrandSecondary: #f59e0b
+--colorBrandAccent: #ec4899
+
+--colorSuccess: #22c55e
+--colorWarning: #f59e0b
+--colorError: #ef4444
+--colorInfo: #3b82f6
+
+--colorNeutral50: #f8fafc
+--colorNeutral100: #f1f5f9
+--colorNeutral200: #e2e8f0
+--colorNeutral300: #cbd5e1
+--colorNeutral400: #94a3b8
+--colorNeutral500: #64748b
+--colorNeutral600: #475569
+--colorNeutral700: #334155
+--colorNeutral800: #1e293b
+--colorNeutral900: #0f172a
+
+--colorBgPrimary: #ffffff
+--colorBgSecondary: #f8fafc
+--colorBgTertiary: #f1f5f9
+
+--colorTextPrimary: #0f172a
+--colorTextSecondary: #475569
+--colorTextTertiary: #94a3b8
+--colorTextInverse: #ffffff
+--colorTextLink: #6366f1
+
+--colorBorder: #e2e8f0
+--colorBorderFocus: #6366f1
+
+--fontSizeXs: 10px
+--fontSizeSm: 12px
+--fontSizeMd: 14px
+--fontSizeLg: 16px
+--fontSizeXl: 18px
+--fontSize2xl: 20px
+--fontSize3xl: 24px
+--fontSize4xl: 30px
+
+--fontWeightNormal: 400
+--fontWeightMedium: 500
+--fontWeightSemibold: 600
+--fontWeightBold: 700
+
+--spacing0: 0px
+--spacing1: 4px
+--spacing2: 8px
+--spacing3: 12px
+--spacing4: 16px
+--spacing5: 20px
+--spacing6: 24px
+--spacing8: 32px
+--spacing10: 40px
+--spacing12: 48px
+--spacing16: 64px
+
+--radiusSm: 4px
+--radiusMd: 8px
+--radiusLg: 12px
+--radiusXl: 16px
+--radiusFull: 9999px
+
+--shadowSm: 0 1px 2px rgba(0,0,0,0.05)
+--shadowMd: 0 4px 6px rgba(0,0,0,0.07)
+--shadowLg: 0 10px 15px rgba(0,0,0,0.1)
+--shadowXl: 0 20px 25px rgba(0,0,0,0.15)
+
+--containerMaxWidth: 1200px
+--sidebarWidth: 240px
+--headerHeight: 56px
+--tabBarHeight: 56px
+--cardPadding: 16px

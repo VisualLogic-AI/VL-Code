@@ -1,0 +1,12 @@
+// VL_VERSION:2.91
+
+APP MyApp
+--title: My Application
+--theme: Theme-Default
+
+NAVIGATION
+--type: tab
+--ITEM home
+----label: Home
+----section: Home
+----icon: home

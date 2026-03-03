@@ -1,0 +1,772 @@
+{
+  "valueDomains": ["Concert", "Registration", "User", "Performer", "Announcement"],
+  "serviceDomains": [
+    {
+      "name": "ConcertDomain",
+      "filePath": "Services/ConcertDomain.vs",
+      "valueDomain": "Concert",
+      "description": "音乐会与座位区域管理服务，涵盖音乐会的增删改查、状态管理、座位区域配置及仪表盘统计",
+      "virtualTables": [
+        {
+          "name": "VT_Concert",
+          "sourceTable": "Concert",
+          "fields": [
+            { "name": "id", "type": "STRING" },
+            { "name": "title", "type": "STRING" },
+            { "name": "description", "type": "STRING" },
+            { "name": "coverImage", "type": "STRING" },
+            { "name": "musicType", "type": "STRING" },
+            { "name": "venue", "type": "STRING" },
+            { "name": "address", "type": "STRING" },
+            { "name": "startTime", "type": "TIMESTAMP" },
+            { "name": "endTime", "type": "TIMESTAMP" },
+            { "name": "gateOpenTime", "type": "TIMESTAMP" },
+            { "name": "status", "type": "STRING" },
+            { "name": "weatherInfo", "type": "STRING" },
+            { "name": "weatherTip", "type": "STRING" },
+            { "name": "totalCapacity", "type": "INT" },
+            { "name": "registrationCount", "type": "INT" },
+            { "name": "createdAt", "type": "TIMESTAMP" },
+            { "name": "updatedAt", "type": "TIMESTAMP" }
+          ]
+        },
+        {
+          "name": "VT_SeatZone",
+          "sourceTable": "SeatZone",
+          "fields": [
+            { "name": "id", "type": "STRING" },
+            { "name": "concertId", "type": "STRING" },
+            { "name": "zoneName", "type": "STRING" },
+            { "name": "capacity", "type": "INT" },
+            { "name": "remainingSeats", "type": "INT" },
+            { "name": "price", "type": "FLOAT" },
+            { "name": "sortOrder", "type": "INT" }
+          ]
+        }
+      ],
+      "services": [
+        {
+          "name": "listConcerts",
+          "type": "QUERY",
+          "description": "获取已发布音乐会列表，按开始时间排序，支持分页",
+          "params": [
+            { "name": "page", "type": "INT", "required": false, "description": "页码，默认1" },
+            { "name": "pageSize", "type": "INT", "required": false, "description": "每页条数，默认10" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Concert>", "description": "已发布音乐会列表" },
+            { "name": "total", "type": "INT", "description": "符合条件的总记录数" },
+            { "name": "page", "type": "INT", "description": "当前页码" },
+            { "name": "pageSize", "type": "INT", "description": "每页条数" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "SELECT",
+          "filters": "status = 'published'",
+          "sort": "startTime ASC"
+        },
+        {
+          "name": "searchConcerts",
+          "type": "QUERY",
+          "description": "按关键词、音乐类型、日期范围、价格范围搜索音乐会",
+          "params": [
+            { "name": "keyword", "type": "STRING", "required": false, "description": "搜索关键词，匹配标题或场地" },
+            { "name": "musicType", "type": "STRING", "required": false, "description": "音乐类型筛选" },
+            { "name": "dateStart", "type": "TIMESTAMP", "required": false, "description": "日期范围起始" },
+            { "name": "dateEnd", "type": "TIMESTAMP", "required": false, "description": "日期范围结束" },
+            { "name": "priceMin", "type": "FLOAT", "required": false, "description": "最低票价" },
+            { "name": "priceMax", "type": "FLOAT", "required": false, "description": "最高票价" },
+            { "name": "page", "type": "INT", "required": false, "description": "页码，默认1" },
+            { "name": "pageSize", "type": "INT", "required": false, "description": "每页条数，默认10" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Concert>", "description": "搜索结果音乐会列表" },
+            { "name": "total", "type": "INT", "description": "符合条件的总记录数" },
+            { "name": "page", "type": "INT", "description": "当前页码" },
+            { "name": "pageSize", "type": "INT", "description": "每页条数" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "SELECT",
+          "filters": "status = 'published' AND (keyword LIKE title OR keyword LIKE venue) AND musicType AND startTime BETWEEN dateStart AND dateEnd",
+          "joins": "LEFT JOIN SeatZone ON Concert.id = SeatZone.concertId (for price filtering)"
+        },
+        {
+          "name": "getConcertDetail",
+          "type": "QUERY",
+          "description": "根据ID获取音乐会完整详情",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "音乐会ID" }
+          ],
+          "returns": [
+            { "name": "concert", "type": "VT_Concert", "description": "音乐会详情对象" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "SELECT_ONE"
+        },
+        {
+          "name": "getSeatZones",
+          "type": "QUERY",
+          "description": "根据音乐会ID获取所有座位区域列表，按排序序号排列",
+          "params": [
+            { "name": "concertId", "type": "STRING", "required": true, "description": "音乐会ID" }
+          ],
+          "returns": [
+            { "name": "zones", "type": "ARRAY<VT_SeatZone>", "description": "座位区域列表" }
+          ],
+          "virtualTable": "VT_SeatZone",
+          "operation": "SELECT",
+          "filters": "concertId = :concertId",
+          "sort": "sortOrder ASC"
+        },
+        {
+          "name": "getDashboardStats",
+          "type": "QUERY",
+          "description": "获取管理端仪表盘统计数据：总音乐会数、总报名人数、本月收入、待举办活动数",
+          "params": [],
+          "returns": [
+            { "name": "totalConcerts", "type": "INT", "description": "总音乐会数量" },
+            { "name": "totalRegistrations", "type": "INT", "description": "总报名人数" },
+            { "name": "monthlyRevenue", "type": "FLOAT", "description": "本月总收入（元）" },
+            { "name": "upcomingCount", "type": "INT", "description": "待举办音乐会数量" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "AGGREGATE"
+        },
+        {
+          "name": "getUpcomingConcerts",
+          "type": "QUERY",
+          "description": "获取近期即将举办的音乐会列表（已发布且开始时间大于当前时间）",
+          "params": [
+            { "name": "limit", "type": "INT", "required": false, "description": "返回条数限制，默认5" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Concert>", "description": "近期音乐会列表" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "SELECT",
+          "filters": "status = 'published' AND startTime > NOW()",
+          "sort": "startTime ASC"
+        },
+        {
+          "name": "listAllConcerts",
+          "type": "QUERY",
+          "description": "获取所有音乐会列表（含草稿、已取消等全部状态），管理端使用",
+          "params": [
+            { "name": "status", "type": "STRING", "required": false, "description": "状态筛选：draft/published/cancelled/finished" },
+            { "name": "keyword", "type": "STRING", "required": false, "description": "关键词搜索" },
+            { "name": "page", "type": "INT", "required": false, "description": "页码，默认1" },
+            { "name": "pageSize", "type": "INT", "required": false, "description": "每页条数，默认20" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Concert>", "description": "全部音乐会列表" },
+            { "name": "total", "type": "INT", "description": "符合条件的总记录数" },
+            { "name": "page", "type": "INT", "description": "当前页码" },
+            { "name": "pageSize", "type": "INT", "description": "每页条数" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "SELECT",
+          "sort": "createdAt DESC"
+        },
+        {
+          "name": "createConcert",
+          "type": "MUTATION",
+          "description": "创建新音乐会，默认状态为草稿",
+          "params": [
+            { "name": "title", "type": "STRING", "required": true, "description": "音乐会名称" },
+            { "name": "description", "type": "STRING", "required": false, "description": "音乐会详细描述" },
+            { "name": "coverImage", "type": "STRING", "required": false, "description": "封面海报图片URL" },
+            { "name": "musicType", "type": "STRING", "required": true, "description": "音乐类型" },
+            { "name": "venue", "type": "STRING", "required": true, "description": "场地名称" },
+            { "name": "address", "type": "STRING", "required": true, "description": "场地详细地址" },
+            { "name": "startTime", "type": "TIMESTAMP", "required": true, "description": "演出开始时间" },
+            { "name": "endTime", "type": "TIMESTAMP", "required": true, "description": "演出结束时间" },
+            { "name": "gateOpenTime", "type": "TIMESTAMP", "required": false, "description": "入场开放时间" }
+          ],
+          "returns": [
+            { "name": "concert", "type": "VT_Concert", "description": "创建成功的音乐会对象" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "INSERT"
+        },
+        {
+          "name": "updateConcert",
+          "type": "MUTATION",
+          "description": "更新音乐会信息",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "音乐会ID" },
+            { "name": "title", "type": "STRING", "required": false, "description": "音乐会名称" },
+            { "name": "description", "type": "STRING", "required": false, "description": "音乐会详细描述" },
+            { "name": "coverImage", "type": "STRING", "required": false, "description": "封面海报图片URL" },
+            { "name": "musicType", "type": "STRING", "required": false, "description": "音乐类型" },
+            { "name": "venue", "type": "STRING", "required": false, "description": "场地名称" },
+            { "name": "address", "type": "STRING", "required": false, "description": "场地详细地址" },
+            { "name": "startTime", "type": "TIMESTAMP", "required": false, "description": "演出开始时间" },
+            { "name": "endTime", "type": "TIMESTAMP", "required": false, "description": "演出结束时间" },
+            { "name": "gateOpenTime", "type": "TIMESTAMP", "required": false, "description": "入场开放时间" },
+            { "name": "weatherInfo", "type": "STRING", "required": false, "description": "天气预报信息（JSON格式）" },
+            { "name": "weatherTip", "type": "STRING", "required": false, "description": "天气穿衣建议" }
+          ],
+          "returns": [
+            { "name": "concert", "type": "VT_Concert", "description": "更新后的音乐会对象" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "UPDATE"
+        },
+        {
+          "name": "deleteConcert",
+          "type": "MUTATION",
+          "description": "删除音乐会（仅允许删除草稿状态的音乐会）",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "音乐会ID" }
+          ],
+          "returns": [
+            { "name": "success", "type": "BOOLEAN", "description": "是否删除成功" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "DELETE"
+        },
+        {
+          "name": "updateConcertStatus",
+          "type": "MUTATION",
+          "description": "更新音乐会状态（草稿→发布、发布→取消等）",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "音乐会ID" },
+            { "name": "status", "type": "STRING", "required": true, "description": "目标状态：draft/published/cancelled/finished" }
+          ],
+          "returns": [
+            { "name": "concert", "type": "VT_Concert", "description": "状态更新后的音乐会对象" }
+          ],
+          "virtualTable": "VT_Concert",
+          "operation": "UPDATE"
+        },
+        {
+          "name": "saveSeatZones",
+          "type": "MUTATION",
+          "description": "批量保存音乐会的座位区域配置（先删除旧配置再插入新配置）",
+          "params": [
+            { "name": "concertId", "type": "STRING", "required": true, "description": "音乐会ID" },
+            { "name": "zones", "type": "ARRAY<OBJECT>", "required": true, "description": "座位区域列表，每项包含 zoneName, capacity, price, sortOrder" }
+          ],
+          "returns": [
+            { "name": "zones", "type": "ARRAY<VT_SeatZone>", "description": "保存后的座位区域列表" }
+          ],
+          "virtualTable": "VT_SeatZone",
+          "operation": "UPSERT_BATCH"
+        }
+      ]
+    },
+    {
+      "name": "RegistrationDomain",
+      "filePath": "Services/RegistrationDomain.vs",
+      "valueDomain": "Registration",
+      "description": "报名与电子票管理服务，涵盖用户报名、取消、电子票查询，以及管理端的报名列表、导出和统计分析",
+      "virtualTables": [
+        {
+          "name": "VT_Registration",
+          "sourceTable": "Registration",
+          "fields": [
+            { "name": "id", "type": "STRING" },
+            { "name": "userId", "type": "STRING" },
+            { "name": "concertId", "type": "STRING" },
+            { "name": "zoneId", "type": "STRING" },
+            { "name": "quantity", "type": "INT" },
+            { "name": "totalPrice", "type": "FLOAT" },
+            { "name": "contactName", "type": "STRING" },
+            { "name": "contactPhone", "type": "STRING" },
+            { "name": "contactEmail", "type": "STRING" },
+            { "name": "ticketCode", "type": "STRING" },
+            { "name": "status", "type": "STRING" },
+            { "name": "createdAt", "type": "TIMESTAMP" },
+            { "name": "cancelledAt", "type": "TIMESTAMP" }
+          ]
+        }
+      ],
+      "services": [
+        {
+          "name": "createRegistration",
+          "type": "MUTATION",
+          "description": "创建报名记录，生成电子票编码，同时扣减座位区域剩余座位数",
+          "params": [
+            { "name": "userId", "type": "STRING", "required": true, "description": "报名用户ID" },
+            { "name": "concertId", "type": "STRING", "required": true, "description": "音乐会ID" },
+            { "name": "zoneId", "type": "STRING", "required": true, "description": "座位区域ID" },
+            { "name": "quantity", "type": "INT", "required": true, "description": "购票数量（1-5）" },
+            { "name": "totalPrice", "type": "FLOAT", "required": true, "description": "总金额" },
+            { "name": "contactName", "type": "STRING", "required": true, "description": "联系人姓名" },
+            { "name": "contactPhone", "type": "STRING", "required": true, "description": "联系人手机号" },
+            { "name": "contactEmail", "type": "STRING", "required": false, "description": "联系人邮箱" }
+          ],
+          "returns": [
+            { "name": "registration", "type": "VT_Registration", "description": "创建成功的报名记录（含电子票编码）" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "INSERT",
+          "sideEffects": ["生成唯一ticketCode", "SeatZone.remainingSeats -= quantity", "Concert.registrationCount += quantity"]
+        },
+        {
+          "name": "getMyRegistrations",
+          "type": "QUERY",
+          "description": "获取当前用户的所有报名记录，按创建时间倒序",
+          "params": [
+            { "name": "userId", "type": "STRING", "required": true, "description": "用户ID" },
+            { "name": "status", "type": "STRING", "required": false, "description": "状态筛选：confirmed/cancelled/used" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Registration>", "description": "用户报名记录列表" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "SELECT",
+          "filters": "userId = :userId",
+          "sort": "createdAt DESC",
+          "joins": "LEFT JOIN Concert ON Registration.concertId = Concert.id, LEFT JOIN SeatZone ON Registration.zoneId = SeatZone.id"
+        },
+        {
+          "name": "cancelRegistration",
+          "type": "MUTATION",
+          "description": "取消报名，更新状态为cancelled，恢复座位区域剩余座位数",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "报名记录ID" }
+          ],
+          "returns": [
+            { "name": "registration", "type": "VT_Registration", "description": "取消后的报名记录" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "UPDATE",
+          "sideEffects": ["设置 status='cancelled', cancelledAt=NOW()", "SeatZone.remainingSeats += quantity", "Concert.registrationCount -= quantity"]
+        },
+        {
+          "name": "getTicketDetail",
+          "type": "QUERY",
+          "description": "根据报名记录ID获取电子票详情，包含音乐会信息和二维码编码",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "报名记录ID" }
+          ],
+          "returns": [
+            { "name": "registration", "type": "VT_Registration", "description": "报名记录详情" },
+            { "name": "concertTitle", "type": "STRING", "description": "音乐会名称" },
+            { "name": "concertStartTime", "type": "TIMESTAMP", "description": "演出开始时间" },
+            { "name": "concertVenue", "type": "STRING", "description": "演出场地" },
+            { "name": "concertAddress", "type": "STRING", "description": "场地地址" },
+            { "name": "zoneName", "type": "STRING", "description": "座位区域名称" },
+            { "name": "weatherInfo", "type": "STRING", "description": "天气预报信息" },
+            { "name": "weatherTip", "type": "STRING", "description": "天气穿衣建议" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "SELECT_ONE",
+          "joins": "LEFT JOIN Concert ON Registration.concertId = Concert.id, LEFT JOIN SeatZone ON Registration.zoneId = SeatZone.id"
+        },
+        {
+          "name": "getRecentRegistrations",
+          "type": "QUERY",
+          "description": "获取最新报名动态列表，管理端仪表盘使用",
+          "params": [
+            { "name": "limit", "type": "INT", "required": false, "description": "返回条数限制，默认10" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Registration>", "description": "最新报名记录列表（含用户昵称和音乐会名称）" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "SELECT",
+          "sort": "createdAt DESC",
+          "joins": "LEFT JOIN User ON Registration.userId = User.id, LEFT JOIN Concert ON Registration.concertId = Concert.id"
+        },
+        {
+          "name": "listAllRegistrations",
+          "type": "QUERY",
+          "description": "获取所有报名记录，支持按音乐会、状态筛选和关键词搜索，管理端使用",
+          "params": [
+            { "name": "concertId", "type": "STRING", "required": false, "description": "按音乐会ID筛选" },
+            { "name": "status", "type": "STRING", "required": false, "description": "状态筛选：confirmed/cancelled/used" },
+            { "name": "keyword", "type": "STRING", "required": false, "description": "搜索报名者姓名或手机号" },
+            { "name": "page", "type": "INT", "required": false, "description": "页码，默认1" },
+            { "name": "pageSize", "type": "INT", "required": false, "description": "每页条数，默认20" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Registration>", "description": "报名记录列表（含关联的音乐会名称、座位区域名称）" },
+            { "name": "total", "type": "INT", "description": "符合条件的总记录数" },
+            { "name": "page", "type": "INT", "description": "当前页码" },
+            { "name": "pageSize", "type": "INT", "description": "每页条数" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "SELECT",
+          "sort": "createdAt DESC",
+          "joins": "LEFT JOIN Concert ON Registration.concertId = Concert.id, LEFT JOIN SeatZone ON Registration.zoneId = SeatZone.id"
+        },
+        {
+          "name": "exportRegistrations",
+          "type": "EXPORT",
+          "description": "导出报名名单为CSV/Excel文件",
+          "params": [
+            { "name": "concertId", "type": "STRING", "required": false, "description": "按音乐会ID筛选导出" },
+            { "name": "status", "type": "STRING", "required": false, "description": "状态筛选" },
+            { "name": "format", "type": "STRING", "required": false, "description": "导出格式：csv/xlsx，默认csv" }
+          ],
+          "returns": [
+            { "name": "fileUrl", "type": "STRING", "description": "导出文件下载URL" },
+            { "name": "fileName", "type": "STRING", "description": "导出文件名" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "EXPORT"
+        },
+        {
+          "name": "getRegistrationTrend",
+          "type": "QUERY",
+          "description": "获取报名趋势数据，按日/周/月统计报名数量",
+          "params": [
+            { "name": "period", "type": "STRING", "required": false, "description": "统计周期：day/week/month，默认day" },
+            { "name": "dateStart", "type": "TIMESTAMP", "required": false, "description": "统计起始日期" },
+            { "name": "dateEnd", "type": "TIMESTAMP", "required": false, "description": "统计结束日期" }
+          ],
+          "returns": [
+            { "name": "trend", "type": "ARRAY<OBJECT>", "description": "趋势数据数组，每项包含 date(STRING) 和 count(INT)" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "AGGREGATE",
+          "aggregation": "COUNT GROUP BY date_trunc(period, createdAt)"
+        },
+        {
+          "name": "getRegistrationByConcert",
+          "type": "QUERY",
+          "description": "获取各音乐会的报名统计数据",
+          "params": [
+            { "name": "limit", "type": "INT", "required": false, "description": "返回条数限制，默认10" }
+          ],
+          "returns": [
+            { "name": "stats", "type": "ARRAY<OBJECT>", "description": "各音乐会统计数组，每项包含 concertId(STRING)、concertTitle(STRING)、registrationCount(INT)、totalRevenue(FLOAT)" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "AGGREGATE",
+          "aggregation": "COUNT, SUM(totalPrice) GROUP BY concertId",
+          "joins": "LEFT JOIN Concert ON Registration.concertId = Concert.id"
+        },
+        {
+          "name": "getZoneDistribution",
+          "type": "QUERY",
+          "description": "获取座位区域偏好分布统计（饼图数据）",
+          "params": [
+            { "name": "concertId", "type": "STRING", "required": false, "description": "按音乐会ID筛选，为空则统计全部" }
+          ],
+          "returns": [
+            { "name": "distribution", "type": "ARRAY<OBJECT>", "description": "区域分布数组，每项包含 zoneName(STRING)、count(INT)、percentage(FLOAT)" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "AGGREGATE",
+          "aggregation": "COUNT GROUP BY zoneId",
+          "joins": "LEFT JOIN SeatZone ON Registration.zoneId = SeatZone.id"
+        },
+        {
+          "name": "getRevenueStats",
+          "type": "QUERY",
+          "description": "获取收入统计汇总数据",
+          "params": [
+            { "name": "dateStart", "type": "TIMESTAMP", "required": false, "description": "统计起始日期" },
+            { "name": "dateEnd", "type": "TIMESTAMP", "required": false, "description": "统计结束日期" }
+          ],
+          "returns": [
+            { "name": "totalRevenue", "type": "FLOAT", "description": "总收入" },
+            { "name": "totalOrders", "type": "INT", "description": "总订单数" },
+            { "name": "totalTickets", "type": "INT", "description": "总票数" },
+            { "name": "averageOrderPrice", "type": "FLOAT", "description": "平均订单金额" },
+            { "name": "revenueByMonth", "type": "ARRAY<OBJECT>", "description": "按月收入数组，每项包含 month(STRING)、revenue(FLOAT)、orders(INT)" }
+          ],
+          "virtualTable": "VT_Registration",
+          "operation": "AGGREGATE",
+          "aggregation": "SUM(totalPrice), COUNT(*), SUM(quantity), AVG(totalPrice)",
+          "filters": "status = 'confirmed'"
+        }
+      ]
+    },
+    {
+      "name": "UserDomain",
+      "filePath": "Services/UserDomain.vs",
+      "valueDomain": "User",
+      "description": "用户信息管理服务，提供用户资料查询和更新功能",
+      "virtualTables": [
+        {
+          "name": "VT_User",
+          "sourceTable": "User",
+          "fields": [
+            { "name": "id", "type": "STRING" },
+            { "name": "nickname", "type": "STRING" },
+            { "name": "realName", "type": "STRING" },
+            { "name": "phone", "type": "STRING" },
+            { "name": "email", "type": "STRING" },
+            { "name": "avatarUrl", "type": "STRING" },
+            { "name": "role", "type": "STRING" },
+            { "name": "createdAt", "type": "TIMESTAMP" }
+          ]
+        }
+      ],
+      "services": [
+        {
+          "name": "getUserProfile",
+          "type": "QUERY",
+          "description": "获取当前用户个人信息",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "用户ID" }
+          ],
+          "returns": [
+            { "name": "user", "type": "VT_User", "description": "用户信息对象" }
+          ],
+          "virtualTable": "VT_User",
+          "operation": "SELECT_ONE"
+        },
+        {
+          "name": "updateUserProfile",
+          "type": "MUTATION",
+          "description": "更新用户个人信息",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "用户ID" },
+            { "name": "nickname", "type": "STRING", "required": false, "description": "昵称" },
+            { "name": "realName", "type": "STRING", "required": false, "description": "真实姓名" },
+            { "name": "phone", "type": "STRING", "required": false, "description": "手机号码" },
+            { "name": "email", "type": "STRING", "required": false, "description": "邮箱地址" },
+            { "name": "avatarUrl", "type": "STRING", "required": false, "description": "头像URL" }
+          ],
+          "returns": [
+            { "name": "user", "type": "VT_User", "description": "更新后的用户信息对象" }
+          ],
+          "virtualTable": "VT_User",
+          "operation": "UPDATE"
+        }
+      ]
+    },
+    {
+      "name": "PerformerDomain",
+      "filePath": "Services/PerformerDomain.vs",
+      "valueDomain": "Performer",
+      "description": "表演者管理服务，涵盖表演者信息的增删改查及音乐会与表演者的关联关系",
+      "virtualTables": [
+        {
+          "name": "VT_Performer",
+          "sourceTable": "Performer",
+          "fields": [
+            { "name": "id", "type": "STRING" },
+            { "name": "name", "type": "STRING" },
+            { "name": "avatarUrl", "type": "STRING" },
+            { "name": "bio", "type": "STRING" },
+            { "name": "genre", "type": "STRING" },
+            { "name": "representative", "type": "STRING" },
+            { "name": "createdAt", "type": "TIMESTAMP" }
+          ]
+        },
+        {
+          "name": "VT_ConcertPerformer",
+          "sourceTable": "ConcertPerformer",
+          "fields": [
+            { "name": "id", "type": "STRING" },
+            { "name": "concertId", "type": "STRING" },
+            { "name": "performerId", "type": "STRING" },
+            { "name": "performOrder", "type": "INT" }
+          ]
+        }
+      ],
+      "services": [
+        {
+          "name": "listPerformers",
+          "type": "QUERY",
+          "description": "获取所有表演者列表，支持关键词搜索",
+          "params": [
+            { "name": "keyword", "type": "STRING", "required": false, "description": "搜索关键词，匹配姓名或风格" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Performer>", "description": "表演者列表" }
+          ],
+          "virtualTable": "VT_Performer",
+          "operation": "SELECT",
+          "sort": "createdAt DESC"
+        },
+        {
+          "name": "getPerformersByConcert",
+          "type": "QUERY",
+          "description": "获取指定音乐会的表演者列表，按演出顺序排列",
+          "params": [
+            { "name": "concertId", "type": "STRING", "required": true, "description": "音乐会ID" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Performer>", "description": "该音乐会的表演者列表（含演出顺序）" }
+          ],
+          "virtualTable": "VT_ConcertPerformer",
+          "operation": "SELECT",
+          "filters": "concertId = :concertId",
+          "sort": "performOrder ASC",
+          "joins": "INNER JOIN Performer ON ConcertPerformer.performerId = Performer.id"
+        },
+        {
+          "name": "createPerformer",
+          "type": "MUTATION",
+          "description": "创建新表演者",
+          "params": [
+            { "name": "name", "type": "STRING", "required": true, "description": "表演者姓名/乐队名" },
+            { "name": "avatarUrl", "type": "STRING", "required": false, "description": "头像URL" },
+            { "name": "bio", "type": "STRING", "required": false, "description": "表演者简介" },
+            { "name": "genre", "type": "STRING", "required": false, "description": "风格标签" },
+            { "name": "representative", "type": "STRING", "required": false, "description": "代表作品" }
+          ],
+          "returns": [
+            { "name": "performer", "type": "VT_Performer", "description": "创建成功的表演者对象" }
+          ],
+          "virtualTable": "VT_Performer",
+          "operation": "INSERT"
+        },
+        {
+          "name": "updatePerformer",
+          "type": "MUTATION",
+          "description": "更新表演者信息",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "表演者ID" },
+            { "name": "name", "type": "STRING", "required": false, "description": "表演者姓名/乐队名" },
+            { "name": "avatarUrl", "type": "STRING", "required": false, "description": "头像URL" },
+            { "name": "bio", "type": "STRING", "required": false, "description": "表演者简介" },
+            { "name": "genre", "type": "STRING", "required": false, "description": "风格标签" },
+            { "name": "representative", "type": "STRING", "required": false, "description": "代表作品" }
+          ],
+          "returns": [
+            { "name": "performer", "type": "VT_Performer", "description": "更新后的表演者对象" }
+          ],
+          "virtualTable": "VT_Performer",
+          "operation": "UPDATE"
+        },
+        {
+          "name": "deletePerformer",
+          "type": "MUTATION",
+          "description": "删除表演者（同时清理与音乐会的关联记录）",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "表演者ID" }
+          ],
+          "returns": [
+            { "name": "success", "type": "BOOLEAN", "description": "是否删除成功" }
+          ],
+          "virtualTable": "VT_Performer",
+          "operation": "DELETE",
+          "sideEffects": ["删除 ConcertPerformer 中 performerId 匹配的记录"]
+        }
+      ]
+    },
+    {
+      "name": "AnnouncementDomain",
+      "filePath": "Services/AnnouncementDomain.vs",
+      "valueDomain": "Announcement",
+      "description": "公告通知管理服务，涵盖公告的增删改查及发布/撤回操作",
+      "virtualTables": [
+        {
+          "name": "VT_Announcement",
+          "sourceTable": "Announcement",
+          "fields": [
+            { "name": "id", "type": "STRING" },
+            { "name": "title", "type": "STRING" },
+            { "name": "content", "type": "STRING" },
+            { "name": "type", "type": "STRING" },
+            { "name": "concertId", "type": "STRING" },
+            { "name": "status", "type": "STRING" },
+            { "name": "publishedAt", "type": "TIMESTAMP" },
+            { "name": "createdAt", "type": "TIMESTAMP" }
+          ]
+        }
+      ],
+      "services": [
+        {
+          "name": "listAnnouncements",
+          "type": "QUERY",
+          "description": "获取已发布的公告列表，紧急公告置顶，支持按音乐会筛选",
+          "params": [
+            { "name": "concertId", "type": "STRING", "required": false, "description": "按关联音乐会筛选" },
+            { "name": "page", "type": "INT", "required": false, "description": "页码，默认1" },
+            { "name": "pageSize", "type": "INT", "required": false, "description": "每页条数，默认20" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Announcement>", "description": "已发布公告列表" },
+            { "name": "total", "type": "INT", "description": "符合条件的总记录数" },
+            { "name": "page", "type": "INT", "description": "当前页码" },
+            { "name": "pageSize", "type": "INT", "description": "每页条数" }
+          ],
+          "virtualTable": "VT_Announcement",
+          "operation": "SELECT",
+          "filters": "status = 'published'",
+          "sort": "type DESC, publishedAt DESC"
+        },
+        {
+          "name": "listAllAnnouncements",
+          "type": "QUERY",
+          "description": "获取所有公告列表（含草稿、已撤回），管理端使用",
+          "params": [
+            { "name": "status", "type": "STRING", "required": false, "description": "状态筛选：draft/published/withdrawn" },
+            { "name": "keyword", "type": "STRING", "required": false, "description": "搜索关键词" },
+            { "name": "page", "type": "INT", "required": false, "description": "页码，默认1" },
+            { "name": "pageSize", "type": "INT", "required": false, "description": "每页条数，默认20" }
+          ],
+          "returns": [
+            { "name": "list", "type": "ARRAY<VT_Announcement>", "description": "全部公告列表（含关联音乐会名称）" },
+            { "name": "total", "type": "INT", "description": "符合条件的总记录数" },
+            { "name": "page", "type": "INT", "description": "当前页码" },
+            { "name": "pageSize", "type": "INT", "description": "每页条数" }
+          ],
+          "virtualTable": "VT_Announcement",
+          "operation": "SELECT",
+          "sort": "createdAt DESC",
+          "joins": "LEFT JOIN Concert ON Announcement.concertId = Concert.id"
+        },
+        {
+          "name": "createAnnouncement",
+          "type": "MUTATION",
+          "description": "创建新公告，默认状态为草稿",
+          "params": [
+            { "name": "title", "type": "STRING", "required": true, "description": "公告标题" },
+            { "name": "content", "type": "STRING", "required": true, "description": "公告正文内容" },
+            { "name": "type", "type": "STRING", "required": true, "description": "公告类型：normal/urgent" },
+            { "name": "concertId", "type": "STRING", "required": false, "description": "关联音乐会ID（为空则为全局公告）" }
+          ],
+          "returns": [
+            { "name": "announcement", "type": "VT_Announcement", "description": "创建成功的公告对象" }
+          ],
+          "virtualTable": "VT_Announcement",
+          "operation": "INSERT"
+        },
+        {
+          "name": "updateAnnouncement",
+          "type": "MUTATION",
+          "description": "更新公告信息",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "公告ID" },
+            { "name": "title", "type": "STRING", "required": false, "description": "公告标题" },
+            { "name": "content", "type": "STRING", "required": false, "description": "公告正文内容" },
+            { "name": "type", "type": "STRING", "required": false, "description": "公告类型：normal/urgent" },
+            { "name": "concertId", "type": "STRING", "required": false, "description": "关联音乐会ID" }
+          ],
+          "returns": [
+            { "name": "announcement", "type": "VT_Announcement", "description": "更新后的公告对象" }
+          ],
+          "virtualTable": "VT_Announcement",
+          "operation": "UPDATE"
+        },
+        {
+          "name": "deleteAnnouncement",
+          "type": "MUTATION",
+          "description": "删除公告",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "公告ID" }
+          ],
+          "returns": [
+            { "name": "success", "type": "BOOLEAN", "description": "是否删除成功" }
+          ],
+          "virtualTable": "VT_Announcement",
+          "operation": "DELETE"
+        },
+        {
+          "name": "togglePublish",
+          "type": "MUTATION",
+          "description": "发布或撤回公告，发布时设置publishedAt，撤回时更新状态为withdrawn",
+          "params": [
+            { "name": "id", "type": "STRING", "required": true, "description": "公告ID" },
+            { "name": "action", "type": "STRING", "required": true, "description": "操作类型：publish/withdraw" }
+          ],
+          "returns": [
+            { "name": "announcement", "type": "VT_Announcement", "description": "操作后的公告对象" }
+          ],
+          "virtualTable": "VT_Announcement",
+          "operation": "UPDATE",
+          "sideEffects": ["publish: 设置 status='published', publishedAt=NOW()", "withdraw: 设置 status='withdrawn'"]
+        }
+      ]
+    }
+  ]
+}

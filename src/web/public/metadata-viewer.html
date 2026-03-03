@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VL Project Metadata</title>
+<style>
+:root {
+  --bg: #0a0c10; --bg2: #12151c; --bg3: #161a24; --border: #2a3040;
+  --text: #e8ecf4; --text2: #8892a4;
+  --c-page: #5ba0ff; --c-section: #38c8d0; --c-comp: #56d8de;
+  --c-service: #40c060; --c-vtable: #80e898; --c-table: #c090ff;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'SF Mono','Fira Code',monospace; font-size:12px; overflow:auto; height:100vh; }
+
+.empty-msg {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  color:var(--text2); font-size:14px; text-align:center; line-height:1.6;
+}
+
+.canvas { position:relative; padding:20px; }
+
+/* Column headers */
+.col-headers { display:flex; gap:60px; padding:0 40px 10px; border-bottom:1px solid var(--border); margin-bottom:20px; position:sticky; top:0; background:var(--bg); z-index:10; }
+.col-header { width:210px; text-align:center; font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; padding:8px 0; }
+.col-header .col-count { display:inline-block; background:var(--bg3); padding:1px 6px; border-radius:8px; margin-left:4px; font-size:9px; }
+
+/* Nodes */
+.node {
+  position:absolute; width:210px; height:52px; background:var(--bg3); border:1px solid var(--border);
+  border-radius:6px; cursor:pointer; transition:border-color 0.2s, opacity 0.2s; z-index:2;
+  display:flex; align-items:center; gap:8px; padding:0 10px;
+}
+.node:hover { border-color:var(--c-page); }
+.node.selected { border-color:var(--c-page); box-shadow:0 0 12px rgba(91,160,255,0.2); }
+.node.dimmed { opacity:0.15; }
+.node-icon { width:28px; height:28px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; color:#fff; flex-shrink:0; }
+.node-info { flex:1; overflow:hidden; }
+.node-title { font-size:11px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.node-sub { font-size:9px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.node-badge { font-size:9px; color:var(--text2); background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:8px; flex-shrink:0; }
+
+/* Node type icon backgrounds */
+.node-page .node-icon { background:rgba(91,160,255,0.2); color:var(--c-page); }
+.node-section .node-icon { background:rgba(56,200,208,0.2); color:var(--c-section); }
+.node-comp .node-icon { background:rgba(86,216,222,0.2); color:var(--c-comp); }
+.node-service .node-icon { background:rgba(64,192,96,0.2); color:var(--c-service); }
+.node-vtable .node-icon { background:rgba(128,232,152,0.2); color:var(--c-vtable); }
+.node-table .node-icon { background:rgba(192,144,255,0.2); color:var(--c-table); }
+
+/* Connections (SVG) */
+.connections { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; }
+.conn { fill:none; stroke-width:1.5; opacity:0.35; transition:opacity 0.2s, stroke-width 0.2s; }
+.conn.highlight { opacity:1; stroke-width:2.5; }
+.conn-ui { stroke:var(--c-page); }
+.conn-comp { stroke:var(--c-comp); }
+.conn-service { stroke:var(--c-service); }
+.conn-data { stroke:var(--c-vtable); }
+
+/* Stats bar */
+.stats-bar { position:fixed; bottom:0; left:0; right:0; background:var(--bg2); border-top:1px solid var(--border); padding:4px 16px; font-size:10px; color:var(--text2); display:flex; gap:16px; z-index:20; }
+.stats-bar .stat { display:flex; align-items:center; gap:4px; }
+.stats-bar .stat-dot { width:6px; height:6px; border-radius:50%; }
+
+/* Detail panel (on node click) */
+.detail-panel {
+  position:fixed; right:0; top:0; bottom:32px; width:280px; background:var(--bg2);
+  border-left:1px solid var(--border); z-index:30; overflow-y:auto; padding:12px;
+  transform:translateX(100%); transition:transform 0.2s;
+}
+.detail-panel.open { transform:translateX(0); }
+.detail-title { font-size:13px; font-weight:700; margin-bottom:8px; color:var(--text); }
+.detail-type { font-size:10px; color:var(--text2); margin-bottom:10px; text-transform:uppercase; letter-spacing:0.5px; }
+.detail-section { margin-bottom:10px; }
+.detail-section-title { font-size:9px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+.detail-item { font-size:10px; padding:2px 0; color:var(--text); word-break:break-all; }
+.detail-close { position:absolute; top:8px; right:8px; cursor:pointer; color:var(--text2); font-size:14px; }
+.detail-close:hover { color:var(--text); }
+</style>
+</head>
+<body>
+<div class="empty-msg" id="emptyMsg">No metadata loaded.<br>Generate auxiliary files to see project structure.</div>
+<div class="canvas" id="canvas" style="display:none;">
+  <div class="col-headers" id="colHeaders"></div>
+  <svg class="connections" id="connSvg"></svg>
+  <div class="nodes-layer" id="nodesLayer"></div>
+</div>
+<div class="stats-bar" id="statsBar" style="display:none;"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="detail-close" onclick="closeDetail()">&times;</div>
+  <div class="detail-title" id="detailTitle"></div>
+  <div class="detail-type" id="detailType"></div>
+  <div id="detailBody"></div>
+</div>
+
+<script>
+const COL_TYPES = ['page', 'section', 'comp', 'service', 'vtable', 'table'];
+const COL_NAMES = ['Apps / Pages', 'Sections', 'Components', 'Services', 'Virtual Tables', 'Tables'];
+const COL_ICONS = { page:'PG', section:'SC', comp:'CP', service:'SV', vtable:'VT', table:'TB' };
+const COL_COLORS = {
+  page:'#5ba0ff', section:'#38c8d0', comp:'#56d8de',
+  service:'#40c060', vtable:'#80e898', table:'#c090ff'
+};
+
+const NODE_W = 210, NODE_H = 52, COL_GAP = 60, ROW_GAP = 14, START_X = 40, START_Y = 60;
+
+let nodes = [], connections = [], selectedNodeId = null;
+let nodeMap = new Map(); // id → node for O(1) lookups
+
+function parseMeta(meta) {
+  nodes = []; connections = []; nodeMap.clear();
+  if (!meta) return;
+
+  // --- Extract nodes ---
+  // Support both auto-extracted format (id/sectionId/consumesServices/methods)
+  // and manual/AI-generated format (name/section/services/serviceDomains)
+
+  // Pages (from apps[].pages[])
+  if (meta.apps) {
+    for (const app of meta.apps) {
+      const appId = app.id || app.name;
+      for (const page of (app.pages || [])) {
+        const id = page.id || page.pageId || page.name || `${appId}_page`;
+        nodes.push({ id, type: 'page', label: id, sub: appId, data: page });
+        // Page → sections: handle both "sections" (array) and "section" (single string)
+        const secRefs = page.sections || (page.section ? [page.section] : []);
+        for (const secRef of secRefs) {
+          let secId;
+          if (typeof secRef === 'string') {
+            secId = secRef;
+          } else if (secRef) {
+            secId = secRef.sectionId || secRef.id || secRef.name || secRef.ref;
+          }
+          if (secId) connections.push({ from: id, to: secId, type: 'ui' });
+        }
+        // Also check page.layout for section references
+        if (page.layout) {
+          collectLayoutRefs(page.layout, id, meta);
+        }
+      }
+    }
+  }
+
+  // Sections
+  if (meta.sections) {
+    for (const sec of meta.sections) {
+      const secId = sec.id || sec.sectionId || sec.name;
+      if (!secId) continue;
+      nodes.push({ id: secId, type: 'section', label: secId, sub: sec.filePath || sec.file || '', data: sec });
+      // Section → services: support both "consumesServices" and "services"
+      const svcRefs = sec.consumesServices || sec.services || [];
+      sec._domainRefs = svcRefs;
+      for (const svcRef of svcRefs) {
+        let svcId;
+        if (typeof svcRef === 'string') {
+          svcId = svcRef;
+        } else {
+          const dom = svcRef.domainId || svcRef.serviceId || svcRef.id || '';
+          const meth = svcRef.method || '';
+          svcId = meth ? `${dom}.${meth}` : dom;
+        }
+        if (svcId) connections.push({ from: secId, to: svcId, type: 'service' });
+      }
+      // Section → components (handle both string and object refs)
+      const cpRefs = sec.usesComponents || sec.components || [];
+      for (const cpRef of cpRefs) {
+        const cpId = typeof cpRef === 'string' ? cpRef : (cpRef.componentId || cpRef.id || cpRef.name);
+        if (cpId) connections.push({ from: secId, to: cpId, type: 'comp' });
+      }
+    }
+  }
+
+  // Components
+  if (meta.components) {
+    for (const cp of meta.components) {
+      const cpId = cp.id || cp.componentId || cp.name;
+      if (!cpId) continue;
+      const propCount = cp.props ? (Array.isArray(cp.props) ? cp.props.length : Object.keys(cp.props).length) : 0;
+      nodes.push({ id: cpId, type: 'comp', label: cpId, sub: cp.filePath || cp.file || '', badge: propCount ? `${propCount}p` : '', data: cp });
+    }
+  }
+
+  // Services: support both "services" and "serviceDomains" as the top-level key
+  const serviceDomains = meta.services || meta.serviceDomains || [];
+  for (const domain of serviceDomains) {
+    const domId = domain.domainId || domain.id || domain.name;
+    if (!domId) continue;
+
+    // Build vTable nodes first (domain-prefixed IDs)
+    // virtualTables can be array of objects or array of strings (just names)
+    const vtNodeIds = [];
+    for (const vt of (domain.virtualTables || [])) {
+      let vtName, vtObj;
+      if (typeof vt === 'string') {
+        vtName = vt; vtObj = { id: vt };
+      } else {
+        vtName = vt.id || vt.name; vtObj = vt;
+      }
+      if (!vtName) continue;
+      const vtId = `${domId}.${vtName}`;
+      vtNodeIds.push(vtId);
+      const fieldsBadge = typeof vtObj.fields === 'string' ? vtObj.fields + 'f' : (vtObj.fields?.length ? `${vtObj.fields.length}f` : '');
+      nodes.push({ id: vtId, type: 'vtable', label: vtName, sub: `source: ${vtObj.source || '?'}`, badge: fieldsBadge, data: vtObj });
+      // vTable → table
+      if (vtObj.source) connections.push({ from: vtId, to: vtObj.source, type: 'data' });
+    }
+
+    // Create one node per method (not per domain)
+    // Support both "methods" and "services" as the methods array key
+    const methods = domain.methods || domain.services || [];
+    if (methods.length > 0) {
+      for (const m of methods) {
+        const mId = m.id || m.name;
+        if (!mId) continue;
+        const svcNodeId = `${domId}.${mId}`;
+        const isPublic = m.isPublic || m.visibility === 'public';
+        nodes.push({ id: svcNodeId, type: 'service', label: mId, sub: domId + (isPublic ? ' (public)' : ''), data: m });
+        // Each method connects to ALL vTables in its domain
+        for (const vtId of vtNodeIds) {
+          connections.push({ from: svcNodeId, to: vtId, type: 'data' });
+        }
+      }
+    } else {
+      // Fallback: if no methods listed, create a single domain node
+      nodes.push({ id: domId, type: 'service', label: domId, sub: domain.filePath || domain.file || '', badge: '0m', data: domain });
+      for (const vtId of vtNodeIds) {
+        connections.push({ from: domId, to: vtId, type: 'data' });
+      }
+    }
+  }
+
+  // Tables (from dataSchema)
+  const tables = meta.dataSchema?.tables || meta.tables || [];
+  for (const tbl of tables) {
+    const tblId = tbl.id || tbl.name;
+    if (!tblId) continue;
+    const fieldCount = tbl.fields?.length || tbl.columns?.length || 0;
+    nodes.push({ id: tblId, type: 'table', label: tblId, sub: 'table', badge: fieldCount ? `${fieldCount}f` : '', data: tbl });
+  }
+
+  // Deduplicate nodes by id
+  const seen = new Set();
+  nodes = nodes.filter(n => { if (seen.has(n.id)) return false; seen.add(n.id); return true; });
+
+  // Build lookup map
+  nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+  // Resolve domain-level section→service refs to per-method nodes
+  // e.g., if section references "Match" but nodes are "Match.GetSports", "Match.GetLiveMatches"
+  const expandedConns = [];
+  for (const c of connections) {
+    if (c.type === 'service' && !nodeMap.has(c.to)) {
+      // Target doesn't exist as a node — look for per-method nodes under this domain
+      const domainPrefix = c.to + '.';
+      const methodNodes = nodes.filter(n => n.type === 'service' && n.id.startsWith(domainPrefix));
+      if (methodNodes.length > 0) {
+        for (const mn of methodNodes) {
+          expandedConns.push({ from: c.from, to: mn.id, type: 'service' });
+        }
+        continue; // Skip original connection
+      }
+    }
+    expandedConns.push(c);
+  }
+  connections = expandedConns;
+
+  // Filter connections: only keep those where both from and to nodes exist
+  connections = connections.filter(c => nodeMap.has(c.from) && nodeMap.has(c.to));
+
+  // Deduplicate connections
+  const connSeen = new Set();
+  connections = connections.filter(c => {
+    const key = `${c.from}→${c.to}`;
+    if (connSeen.has(key)) return false;
+    connSeen.add(key); return true;
+  });
+
+  layoutAndRender();
+}
+
+/** Recursively collect section/component refs from page layout tree */
+function collectLayoutRefs(layoutNodes, pageId, meta) {
+  if (!Array.isArray(layoutNodes)) return;
+  const sectionIds = new Set((meta?.sections || []).map(s => s.id || s.sectionId).filter(Boolean));
+  const compIds = new Set((meta?.components || []).map(c => c.id || c.componentId).filter(Boolean));
+  _collectLayoutRefsInner(layoutNodes, pageId, sectionIds, compIds);
+}
+function _collectLayoutRefsInner(layoutNodes, pageId, sectionIds, compIds) {
+  if (!Array.isArray(layoutNodes)) return;
+  for (const node of layoutNodes) {
+    if (node.sectionId) connections.push({ from: pageId, to: node.sectionId, type: 'ui' });
+    if (node.componentId) connections.push({ from: pageId, to: node.componentId, type: 'comp' });
+    // Handle layout nodes that use "ref" field (e.g., { "ref": "AgentNavSection", "as": "agentNav" })
+    if (node.ref) {
+      const ref = node.ref;
+      if (sectionIds.has(ref) || ref.endsWith('Section')) {
+        connections.push({ from: pageId, to: ref, type: 'ui' });
+      } else if (compIds.has(ref)) {
+        connections.push({ from: pageId, to: ref, type: 'comp' });
+      } else {
+        // Unknown target type — default to ui connection so it isn't lost
+        connections.push({ from: pageId, to: ref, type: 'ui' });
+      }
+    }
+    if (node.children) _collectLayoutRefsInner(node.children, pageId, sectionIds, compIds);
+  }
+}
+
+function layoutAndRender() {
+  // Auto-layout: 6 columns
+  const colNodes = {};
+  for (const t of COL_TYPES) colNodes[t] = [];
+  for (const n of nodes) {
+    if (colNodes[n.type]) colNodes[n.type].push(n);
+  }
+
+  // Sort nodes within each column by connection order for cleaner routing
+  for (const type of COL_TYPES) {
+    colNodes[type].sort((a, b) => {
+      const aConns = connections.filter(c => c.to === a.id || c.from === a.id).length;
+      const bConns = connections.filter(c => c.to === b.id || c.from === b.id).length;
+      return bConns - aConns; // Most connected first
+    });
+  }
+
+  let maxY = 0;
+  for (let ci = 0; ci < COL_TYPES.length; ci++) {
+    const type = COL_TYPES[ci];
+    const x = START_X + ci * (NODE_W + COL_GAP);
+    for (let ri = 0; ri < colNodes[type].length; ri++) {
+      colNodes[type][ri].x = x;
+      colNodes[type][ri].y = START_Y + ri * (NODE_H + ROW_GAP);
+      maxY = Math.max(maxY, colNodes[type][ri].y + NODE_H);
+    }
+  }
+
+  // Auto-size canvas
+  const maxX = START_X + COL_TYPES.length * (NODE_W + COL_GAP) + 40;
+  const canvasH = maxY + 80;
+  const canvas = $('canvas');
+  canvas.style.minWidth = maxX + 'px';
+  canvas.style.minHeight = canvasH + 'px';
+
+  // Set explicit SVG dimensions to prevent connection clipping
+  const svg = $('connSvg');
+  svg.setAttribute('width', maxX);
+  svg.setAttribute('height', canvasH);
+
+  render();
+}
+
+function render() {
+  $('emptyMsg').style.display = 'none';
+  $('canvas').style.display = 'block';
+  $('statsBar').style.display = 'flex';
+
+  // Column headers with counts
+  const hdr = $('colHeaders');
+  hdr.innerHTML = '';
+  for (let i = 0; i < COL_NAMES.length; i++) {
+    const count = nodes.filter(n => n.type === COL_TYPES[i]).length;
+    const div = document.createElement('div');
+    div.className = 'col-header';
+    div.innerHTML = `${COL_NAMES[i]}<span class="col-count">${count}</span>`;
+    hdr.appendChild(div);
+  }
+
+  renderNodes();
+  renderConnections();
+  renderStats();
+}
+
+function renderNodes() {
+  const layer = $('nodesLayer');
+  layer.innerHTML = '';
+
+  for (const node of nodes) {
+    if (node.x === undefined) continue;
+    const div = document.createElement('div');
+    div.className = `node node-${node.type}` + (node.id === selectedNodeId ? ' selected' : '');
+    div.id = `meta-${node.id}`;
+    div.style.left = node.x + 'px';
+    div.style.top = node.y + 'px';
+
+    div.innerHTML = `
+      <div class="node-icon">${COL_ICONS[node.type] || '?'}</div>
+      <div class="node-info">
+        <div class="node-title">${esc(node.label)}</div>
+        <div class="node-sub">${esc(node.sub || '')}</div>
+      </div>
+      ${node.badge ? `<div class="node-badge">${esc(node.badge)}</div>` : ''}
+    `;
+
+    div.onclick = () => selectNode(node.id);
+    div.onmouseenter = () => highlightRelated(node.id);
+    div.onmouseleave = () => clearHighlight();
+    layer.appendChild(div);
+  }
+}
+
+function renderConnections() {
+  const svg = $('connSvg');
+  svg.innerHTML = '';
+
+  for (const conn of connections) {
+    const fromNode = nodeMap.get(conn.from);
+    const toNode = nodeMap.get(conn.to);
+    if (!fromNode || !toNode || fromNode.x === undefined || toNode.x === undefined) continue;
+
+    // Determine connection direction
+    const goesRight = toNode.x > fromNode.x;
+    const sameColumn = Math.abs(toNode.x - fromNode.x) < NODE_W;
+
+    let x1, y1, x2, y2, d;
+
+    if (sameColumn) {
+      // Same column: route from bottom to top
+      x1 = fromNode.x + NODE_W / 2;
+      y1 = fromNode.y + NODE_H;
+      x2 = toNode.x + NODE_W / 2;
+      y2 = toNode.y;
+      const offset = 30;
+      d = `M ${x1} ${y1} C ${x1 + offset} ${y1 + 20}, ${x2 + offset} ${y2 - 20}, ${x2} ${y2}`;
+    } else if (goesRight) {
+      // Normal left-to-right: right edge → left edge
+      x1 = fromNode.x + NODE_W;
+      y1 = fromNode.y + NODE_H / 2;
+      x2 = toNode.x;
+      y2 = toNode.y + NODE_H / 2;
+      const dx = Math.abs(x2 - x1);
+      const cp = Math.min(dx * 0.4, 80);
+      d = `M ${x1} ${y1} C ${x1 + cp} ${y1}, ${x2 - cp} ${y2}, ${x2} ${y2}`;
+    } else {
+      // Backward (right-to-left): use curved arc over the top
+      x1 = fromNode.x;
+      y1 = fromNode.y + NODE_H / 2;
+      x2 = toNode.x + NODE_W;
+      y2 = toNode.y + NODE_H / 2;
+      const midY = Math.min(fromNode.y, toNode.y) - 40;
+      d = `M ${x1} ${y1} C ${x1 - 40} ${midY}, ${x2 + 40} ${midY}, ${x2} ${y2}`;
+    }
+
+    const connClass = { ui: 'conn-ui', comp: 'conn-comp', service: 'conn-service', data: 'conn-data' }[conn.type] || 'conn-ui';
+
+    const path = svgEl('path');
+    path.setAttribute('class', `conn ${connClass}`);
+    path.setAttribute('d', d);
+    path.dataset.from = conn.from;
+    path.dataset.to = conn.to;
+    svg.appendChild(path);
+  }
+}
+
+function renderStats() {
+  const counts = {};
+  for (const t of COL_TYPES) counts[t] = nodes.filter(n => n.type === t).length;
+  const totalConns = connections.length;
+
+  $('statsBar').innerHTML = COL_TYPES.map(t =>
+    `<div class="stat"><div class="stat-dot" style="background:${COL_COLORS[t]}"></div>${COL_NAMES[COL_TYPES.indexOf(t)]}: ${counts[t]}</div>`
+  ).join('') + `<div class="stat" style="margin-left:auto">${totalConns} connections</div>`;
+}
+
+function selectNode(id) {
+  selectedNodeId = id;
+  renderNodes();
+  renderConnections();
+  showDetail(id);
+  window.parent.postMessage({ type: 'metaNodeClick', nodeType: nodeMap.get(id)?.type, nodeName: id }, '*');
+}
+
+function showDetail(id) {
+  const node = nodeMap.get(id);
+  if (!node) return;
+  const panel = $('detailPanel');
+  $('detailTitle').textContent = node.label;
+  $('detailType').textContent = node.type;
+
+  const body = $('detailBody');
+  body.innerHTML = '';
+
+  // Sub info
+  if (node.sub) {
+    addDetailSection(body, 'Path', [node.sub]);
+  }
+
+  // Connected nodes
+  const incoming = connections.filter(c => c.to === id).map(c => `← ${c.from}` + (c.label ? ` (${c.label})` : ''));
+  const outgoing = connections.filter(c => c.from === id).map(c => `→ ${c.to}` + (c.label ? ` (${c.label})` : ''));
+  if (incoming.length) addDetailSection(body, 'Incoming', incoming);
+  if (outgoing.length) addDetailSection(body, 'Outgoing', outgoing);
+
+  // Type-specific details
+  const d = node.data || {};
+  if (node.type === 'service' && d.methods) {
+    addDetailSection(body, 'Methods', d.methods.map(m => `${m.id || m.name}()`));
+  }
+  if (node.type === 'table' && (d.fields || d.columns)) {
+    const fields = d.fields || d.columns || [];
+    addDetailSection(body, 'Fields', fields.map(f => `${f.name || f.id}: ${f.type || '?'}`));
+  }
+  if (node.type === 'vtable' && d.fields) {
+    addDetailSection(body, 'Fields', d.fields.map(f => `${f.name || f.id}: ${f.type || '?'}`));
+  }
+  if (node.type === 'comp' && d.props) {
+    const props = Array.isArray(d.props) ? d.props.map(p => typeof p === 'string' ? p : `${p.name}: ${p.type || '?'}`) : Object.entries(d.props).map(([k,v]) => `${k}: ${typeof v === 'string' ? v : v.type || '?'}`);
+    addDetailSection(body, 'Props', props);
+  }
+
+  panel.classList.add('open');
+}
+
+function addDetailSection(parent, title, items) {
+  const sec = document.createElement('div');
+  sec.className = 'detail-section';
+  sec.innerHTML = `<div class="detail-section-title">${esc(title)}</div>` +
+    items.map(i => `<div class="detail-item">${esc(i)}</div>`).join('');
+  parent.appendChild(sec);
+}
+
+function closeDetail() {
+  $('detailPanel').classList.remove('open');
+  selectedNodeId = null;
+  renderNodes();
+}
+
+function highlightRelated(id) {
+  // Find connected nodes (multi-hop for better visibility)
+  const related = new Set([id]);
+  for (const c of connections) {
+    if (c.from === id) related.add(c.to);
+    if (c.to === id) related.add(c.from);
+  }
+
+  // Dim unrelated nodes
+  document.querySelectorAll('.node').forEach(el => {
+    const nid = el.id.replace('meta-', '');
+    el.classList.toggle('dimmed', !related.has(nid));
+  });
+
+  // Highlight related connections
+  document.querySelectorAll('.conn').forEach(el => {
+    const isRelated = el.dataset.from === id || el.dataset.to === id;
+    el.classList.toggle('highlight', isRelated);
+  });
+}
+
+function clearHighlight() {
+  document.querySelectorAll('.node.dimmed').forEach(el => el.classList.remove('dimmed'));
+  document.querySelectorAll('.conn.highlight').forEach(el => el.classList.remove('highlight'));
+}
+
+// ===== PostMessage API =====
+window.addEventListener('message', (e) => {
+  if (!e.data?.type) return;
+
+  switch (e.data.type) {
+    case 'loadMetadata':
+      parseMeta(e.data.data);
+      break;
+
+    case 'highlightNode': {
+      const el = document.getElementById(`meta-${e.data.nodeId}`);
+      if (el) {
+        selectNode(e.data.nodeId);
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+      break;
+    }
+  }
+});
+
+// Notify parent we're ready
+window.parent.postMessage({ type: 'ready' }, '*');
+
+// ===== Utilities =====
+function $(id) { return document.getElementById(id); }
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+function svgEl(tag) { return document.createElementNS('http://www.w3.org/2000/svg', tag); }
+</script>
+</body>
+</html>

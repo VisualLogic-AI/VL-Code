@@ -1,0 +1,87 @@
+// VL_VERSION:2.91
+
+# Database Tables
+
+TABLE Concert
+--id(STRING)
+--title(STRING)
+--description(STRING)
+--coverImage(STRING)
+--musicType(STRING)
+--venue(STRING)
+--address(STRING)
+--startTime(TIMESTAMP)
+--endTime(TIMESTAMP)
+--gateOpenTime(TIMESTAMP)
+--status(STRING)
+--weatherInfo(STRING)
+--weatherTip(STRING)
+--totalCapacity(INT)
+--registrationCount(INT)
+--createdAt(TIMESTAMP)
+--updatedAt(TIMESTAMP)
+
+TABLE SeatZone
+--id(STRING)
+--concertId(STRING)
+--zoneName(STRING)
+--capacity(INT)
+--remainingSeats(INT)
+--price(FLOAT)
+--sortOrder(INT)
+
+TABLE User
+--id(STRING)
+--nickname(STRING)
+--realName(STRING)
+--phone(STRING)
+--email(STRING)
+--avatarUrl(STRING)
+--role(STRING)
+--createdAt(TIMESTAMP)
+
+TABLE Registration
+--id(STRING)
+--userId(STRING)
+--concertId(STRING)
+--zoneId(STRING)
+--quantity(INT)
+--totalPrice(FLOAT)
+--contactName(STRING)
+--contactPhone(STRING)
+--contactEmail(STRING)
+--ticketCode(STRING)
+--status(STRING)
+--createdAt(TIMESTAMP)
+--cancelledAt(TIMESTAMP)
+
+TABLE Performer
+--id(STRING)
+--name(STRING)
+--avatarUrl(STRING)
+--bio(STRING)
+--genre(STRING)
+--representative(STRING)
+--createdAt(TIMESTAMP)
+
+TABLE ConcertPerformer
+--id(STRING)
+--concertId(STRING)
+--performerId(STRING)
+--performOrder(INT)
+
+TABLE Favorite
+--id(STRING)
+--userId(STRING)
+--concertId(STRING)
+--createdAt(TIMESTAMP)
+
+TABLE Announcement
+--id(STRING)
+--title(STRING)
+--content(STRING)
+--type(STRING)
+--concertId(STRING)
+--status(STRING)
+--publishedAt(TIMESTAMP)
+--createdAt(TIMESTAMP)

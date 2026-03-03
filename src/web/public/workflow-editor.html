@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VL Workflow DAG</title>
+<style>
+:root {
+  --bg: #0a0d12; --bg2: #12161c; --bg3: #1a1f27; --border: #2a3140;
+  --text: #e6edf3; --text2: #8b949e; --blue: #58a6ff; --purple: #a371f7;
+  --orange: #d29922; --green: #3fb950; --red: #f85149; --cyan: #39c5cf;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'SF Mono','Fira Code',monospace; font-size:12px; overflow:auto; height:100vh; }
+
+.canvas {
+  position:relative; min-width:4000px; min-height:2500px;
+  background-image:radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size:20px 20px;
+}
+
+.empty-msg {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  color:var(--text2); font-size:14px; text-align:center;
+}
+
+/* ===== Nodes ===== */
+.node {
+  position:absolute; width:220px; background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; cursor:pointer; transition:border-color 0.2s, box-shadow 0.2s;
+  z-index:2;
+}
+.node:hover { border-color:var(--blue); box-shadow:0 0 12px rgba(88,166,255,0.15); }
+.node.selected { border-color:var(--blue); box-shadow:0 0 20px rgba(88,166,255,0.25); }
+
+.node-header { display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--border); }
+.node-icon { width:24px; height:24px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; color:#fff; }
+.node-title { font-size:11px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.node-type { font-size:9px; color:var(--text2); }
+
+.node-body { padding:6px 10px; font-size:10px; color:var(--text2); max-height:60px; overflow:hidden; }
+.node-body .field { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Node type colors */
+.type-LLM .node-icon { background:linear-gradient(135deg, #6366f1, #8b5cf6); }
+.type-Service .node-icon { background:linear-gradient(135deg, var(--green), #2ea043); }
+.type-API .node-icon { background:linear-gradient(135deg, var(--cyan), #1a7f8a); }
+.type-Write .node-icon { background:linear-gradient(135deg, var(--orange), #b87f12); }
+.type-Set .node-icon { background:linear-gradient(135deg, var(--blue), #1f6feb); }
+.type-Branch .node-icon { background:linear-gradient(135deg, var(--purple), #8957e5); }
+.type-Loop .node-icon { background:linear-gradient(135deg, #db61a2, #bf4b8a); }
+.type-Stop .node-icon { background:linear-gradient(135deg, var(--red), #da3633); }
+.type-Component .node-icon { background:linear-gradient(135deg, #2dd4bf, #14b8a6); }
+
+/* Status overlays */
+.node.status-running { border-color:var(--orange); animation:pulse-border 1.5s ease-in-out infinite; }
+.node.status-done { border-color:var(--green); }
+.node.status-error { border-color:var(--red); }
+
+.status-badge { position:absolute; top:-6px; right:-6px; width:16px; height:16px; border-radius:50%; font-size:9px; display:flex; align-items:center; justify-content:center; z-index:5; }
+.status-badge.running { background:var(--orange); animation:spin 1s linear infinite; }
+.status-badge.done { background:var(--green); }
+.status-badge.error { background:var(--red); }
+
+@keyframes pulse-border { 0%,100% { box-shadow:0 0 8px rgba(210,153,34,0.3); } 50% { box-shadow:0 0 20px rgba(210,153,34,0.6); } }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ===== Ports ===== */
+.port { position:absolute; width:8px; height:8px; border-radius:50%; background:var(--border); border:1px solid var(--text2); z-index:3; }
+.port-in { top:-4px; left:50%; transform:translateX(-50%); }
+.port-out { bottom:-4px; left:50%; transform:translateX(-50%); }
+
+/* ===== Connections (SVG) ===== */
+.connections { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1; }
+.conn-path { fill:none; stroke-width:2; }
+.conn-path.serial { stroke:var(--blue); }
+.conn-path.parallel { stroke:var(--purple); stroke-dasharray:6 3; }
+.conn-path.branch-case { stroke:var(--orange); stroke-dasharray:4 2 1 2; }
+.conn-label { fill:var(--text2); font-size:9px; font-family:inherit; }
+
+/* Arrow markers */
+svg defs marker path { fill:var(--blue); }
+</style>
+</head>
+<body>
+<div class="empty-msg" id="emptyMsg">No workflow loaded.<br>Select a workflow to visualize.</div>
+<div class="canvas" id="canvas" style="display:none;">
+  <svg class="connections" id="connSvg">
+    <defs>
+      <marker id="arrowSerial" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <path d="M 0 0 L 8 3 L 0 6 Z" fill="var(--blue)"/>
+      </marker>
+      <marker id="arrowParallel" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <path d="M 0 0 L 8 3 L 0 6 Z" fill="var(--purple)"/>
+      </marker>
+      <marker id="arrowBranch" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <path d="M 0 0 L 8 3 L 0 6 Z" fill="var(--orange)"/>
+      </marker>
+    </defs>
+  </svg>
+  <div class="nodes-layer" id="nodesLayer"></div>
+</div>
+
+<script>
+const NODE_ICONS = {
+  LLM:'AI', Service:'SV', API:'AP', Component:'CP',
+  Set:'=', Write:'WR', Branch:'BR', Loop:'LP', Stop:'ST'
+};
+
+let state = { nodes: [], connections: [], selectedNodeId: null };
+
+// ===== Parse workflow JSON into internal state =====
+function parseWorkflow(json) {
+  state.nodes = [];
+  state.connections = [];
+
+  if (!json?.steps?.length) return;
+
+  const steps = json.steps;
+
+  // Create nodes
+  for (const step of steps) {
+    const type = step.type || step.id?.split('_')[0] || 'LLM';
+    state.nodes.push({
+      id: step.id,
+      type,
+      x: step._x || 0,
+      y: step._y || 0,
+      data: step,
+      status: null
+    });
+  }
+
+  // Create connections
+  let connId = 0;
+  for (const step of steps) {
+    if (step.next) {
+      state.connections.push({
+        id: 'c' + (connId++),
+        from: step.id, to: step.next,
+        type: 'serial'
+      });
+    }
+    if (step.children?.length) {
+      for (const childId of step.children) {
+        state.connections.push({
+          id: 'c' + (connId++),
+          from: step.id, to: childId,
+          type: 'parallel'
+        });
+      }
+    }
+    if (step.cases) {
+      for (const [caseExpr, targetId] of Object.entries(step.cases)) {
+        state.connections.push({
+          id: 'c' + (connId++),
+          from: step.id, to: targetId,
+          type: 'branch-case',
+          label: caseExpr
+        });
+      }
+    }
+  }
+
+  // Auto-layout if no positions set
+  const hasPos = state.nodes.some(n => n.x > 0 || n.y > 0);
+  if (!hasPos) autoLayout();
+
+  render();
+}
+
+// ===== Auto Layout (topological left-to-right) =====
+function autoLayout() {
+  const LAYER_GAP = 280, NODE_GAP = 140, START_X = 80, START_Y = 60;
+  const nodeMap = new Map(state.nodes.map(n => [n.id, n]));
+
+  // Build adjacency
+  const succs = new Map(), preds = new Map();
+  for (const n of state.nodes) { succs.set(n.id, []); preds.set(n.id, []); }
+  for (const c of state.connections) {
+    succs.get(c.from)?.push(c.to);
+    preds.get(c.to)?.push(c.from);
+  }
+
+  // Find roots (no predecessors)
+  const roots = state.nodes.filter(n => (preds.get(n.id)?.length || 0) === 0).map(n => n.id);
+  if (roots.length === 0 && state.nodes.length > 0) roots.push(state.nodes[0].id);
+
+  // Longest-path layer assignment
+  const layers = new Map();
+  const visited = new Set();
+
+  function assignLayer(id, depth) {
+    if (visited.has(id)) return;
+    visited.add(id);
+    layers.set(id, Math.max(layers.get(id) || 0, depth));
+    for (const s of (succs.get(id) || [])) {
+      assignLayer(s, depth + 1);
+    }
+    visited.delete(id);
+  }
+
+  for (const r of roots) assignLayer(r, 0);
+  // Assign unvisited nodes
+  for (const n of state.nodes) {
+    if (!layers.has(n.id)) layers.set(n.id, 0);
+  }
+
+  // Group by layer
+  const layerGroups = new Map();
+  for (const [id, layer] of layers) {
+    if (!layerGroups.has(layer)) layerGroups.set(layer, []);
+    layerGroups.get(layer).push(id);
+  }
+
+  // Position nodes
+  const sortedLayers = [...layerGroups.keys()].sort((a, b) => a - b);
+  for (const layer of sortedLayers) {
+    const group = layerGroups.get(layer);
+    for (let i = 0; i < group.length; i++) {
+      const node = nodeMap.get(group[i]);
+      if (node) {
+        node.x = START_X + layer * LAYER_GAP;
+        node.y = START_Y + i * NODE_GAP;
+      }
+    }
+  }
+}
+
+// ===== Render =====
+function render() {
+  $('emptyMsg').style.display = 'none';
+  $('canvas').style.display = 'block';
+  renderNodes();
+  renderConnections();
+}
+
+function renderNodes() {
+  const layer = $('nodesLayer');
+  layer.innerHTML = '';
+
+  for (const node of state.nodes) {
+    const div = document.createElement('div');
+    const type = node.type || 'LLM';
+    div.className = `node type-${type}` + (node.id === state.selectedNodeId ? ' selected' : '') + (node.status ? ` status-${node.status}` : '');
+    div.id = `node-${node.id}`;
+    div.style.left = node.x + 'px';
+    div.style.top = node.y + 'px';
+
+    const icon = NODE_ICONS[type] || '?';
+    const title = node.data?.meta?.title || node.data?.id || node.id;
+    const nodeType = type + (node.data?.meta?.description ? ` · ${node.data.meta.description.substring(0, 30)}` : '');
+
+    // Body: show key inputs
+    let bodyHtml = '';
+    if (node.data?.in) {
+      const keys = Object.keys(node.data.in).slice(0, 3);
+      bodyHtml = keys.map(k => `<div class="field">${esc(k)}: ${esc(String(node.data.in[k]).substring(0, 40))}</div>`).join('');
+    }
+
+    // Status badge
+    let badgeHtml = '';
+    if (node.status === 'running') badgeHtml = '<div class="status-badge running">&#9881;</div>';
+    else if (node.status === 'done') badgeHtml = '<div class="status-badge done">&#10003;</div>';
+    else if (node.status === 'error') badgeHtml = '<div class="status-badge error">&#10007;</div>';
+
+    div.innerHTML = `
+      ${badgeHtml}
+      <div class="port port-in"></div>
+      <div class="node-header">
+        <div class="node-icon">${icon}</div>
+        <div>
+          <div class="node-title">${esc(title)}</div>
+          <div class="node-type">${esc(nodeType)}</div>
+        </div>
+      </div>
+      ${bodyHtml ? `<div class="node-body">${bodyHtml}</div>` : ''}
+      <div class="port port-out" style="bottom:-4px;left:50%;transform:translateX(-50%);"></div>
+    `;
+
+    div.onclick = () => {
+      state.selectedNodeId = node.id;
+      renderNodes();
+      // Notify parent
+      window.parent.postMessage({ type: 'nodeClick', nodeId: node.id, nodeType: type }, '*');
+    };
+
+    layer.appendChild(div);
+  }
+}
+
+function renderConnections() {
+  const svg = $('connSvg');
+  // Clear old connections (keep defs)
+  svg.querySelectorAll('.conn-group').forEach(g => g.remove());
+
+  for (const conn of state.connections) {
+    const fromEl = $(`node-${conn.from}`);
+    const toEl = $(`node-${conn.to}`);
+    if (!fromEl || !toEl) continue;
+
+    const canvasRect = $('canvas').getBoundingClientRect();
+    const fromRect = fromEl.getBoundingClientRect();
+    const toRect = toEl.getBoundingClientRect();
+
+    // From bottom-center of source to top-center of target
+    const x1 = fromRect.left + fromRect.width / 2 - canvasRect.left + $('canvas').parentElement.scrollLeft;
+    const y1 = fromRect.bottom - canvasRect.top + document.documentElement.scrollTop;
+    const x2 = toRect.left + toRect.width / 2 - canvasRect.left + $('canvas').parentElement.scrollLeft;
+    const y2 = toRect.top - canvasRect.top + document.documentElement.scrollTop;
+
+    const cp = Math.max(40, Math.abs(y2 - y1) * 0.4);
+    const d = `M ${x1} ${y1} C ${x1} ${y1 + cp}, ${x2} ${y2 - cp}, ${x2} ${y2}`;
+
+    const markerMap = { serial: 'arrowSerial', parallel: 'arrowParallel', 'branch-case': 'arrowBranch' };
+    const marker = markerMap[conn.type] || 'arrowSerial';
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'conn-group');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('class', `conn-path ${conn.type}`);
+    path.setAttribute('d', d);
+    path.setAttribute('marker-end', `url(#${marker})`);
+    g.appendChild(path);
+
+    if (conn.label) {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('class', 'conn-label');
+      text.setAttribute('x', (x1 + x2) / 2);
+      text.setAttribute('y', (y1 + y2) / 2 - 5);
+      text.setAttribute('text-anchor', 'middle');
+      text.textContent = conn.label;
+      g.appendChild(text);
+    }
+
+    svg.appendChild(g);
+  }
+}
+
+// ===== PostMessage API =====
+window.addEventListener('message', (e) => {
+  if (!e.data?.type) return;
+
+  switch (e.data.type) {
+    case 'loadWorkflow':
+      parseWorkflow(e.data.data);
+      break;
+
+    case 'highlightNode':
+      state.selectedNodeId = e.data.nodeId;
+      renderNodes();
+      // Scroll to node
+      const el = $(`node-${e.data.nodeId}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      break;
+
+    case 'updateNodeStatus': {
+      const node = state.nodes.find(n => n.id === e.data.nodeId);
+      if (node) {
+        node.status = e.data.status; // 'running' | 'done' | 'error' | null
+        renderNodes();
+        renderConnections();
+      }
+      break;
+    }
+
+    case 'clearStatus':
+      for (const n of state.nodes) n.status = null;
+      renderNodes();
+      break;
+  }
+});
+
+// Notify parent we're ready
+window.parent.postMessage({ type: 'ready' }, '*');
+
+// ===== Utilities =====
+function $(id) { return document.getElementById(id); }
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+
+// Re-render connections on scroll/resize
+window.addEventListener('scroll', () => renderConnections());
+window.addEventListener('resize', () => renderConnections());
+</script>
+</body>
+</html>

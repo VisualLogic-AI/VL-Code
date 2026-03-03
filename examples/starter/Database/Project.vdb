@@ -1,0 +1,9 @@
+// VL_VERSION:2.91
+
+DATABASE Project
+
+TABLE User
+--Column id(INT) primaryKey autoIncrement
+--Column name(STRING) notNull
+--Column email(STRING) unique
+--Column createdAt(DATETIME) default:now()

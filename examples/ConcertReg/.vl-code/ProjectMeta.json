@@ -1,0 +1,586 @@
+{
+  "$schema": "VL-ProjectMeta/1.0",
+  "projectName": "ConcertReg",
+  "projectDescription": "露天音乐会报名系统，支持用户浏览音乐会、在线报名购票、查看电子票二维码。包含天气提醒、座位区域选择等露天音乐会特色功能。",
+  "vlVersion": "2.91",
+  "config": {
+    "defaultDevice": "MOBILE",
+    "defaultResolution": "390x844",
+    "themeFile": "Theme/Theme-Default.vth",
+    "colorScheme": "light"
+  },
+  "valueDomains": {
+    "enums": [
+      {
+        "id": "MusicType",
+        "values": ["流行", "摇滚", "古典", "民谣", "电子", "爵士"]
+      },
+      {
+        "id": "ConcertStatus",
+        "values": ["draft", "published", "cancelled", "finished"]
+      },
+      {
+        "id": "RegistrationStatus",
+        "values": ["confirmed", "cancelled", "used"]
+      },
+      {
+        "id": "AnnouncementType",
+        "values": ["normal", "urgent"]
+      },
+      {
+        "id": "AnnouncementStatus",
+        "values": ["draft", "published", "withdrawn"]
+      },
+      {
+        "id": "UserRole",
+        "values": ["user", "admin"]
+      }
+    ],
+    "constants": []
+  },
+  "dataSchema": {
+    "tables": [
+      {
+        "id": "Concert",
+        "fields": [
+          {"name": "id", "type": "STRING", "constraints": ["PK"]},
+          {"name": "title", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "description", "type": "STRING"},
+          {"name": "coverImage", "type": "STRING"},
+          {"name": "musicType", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "venue", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "address", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "startTime", "type": "TIMESTAMP", "constraints": ["notNull"]},
+          {"name": "endTime", "type": "TIMESTAMP", "constraints": ["notNull"]},
+          {"name": "gateOpenTime", "type": "TIMESTAMP"},
+          {"name": "status", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "weatherInfo", "type": "STRING"},
+          {"name": "weatherTip", "type": "STRING"},
+          {"name": "totalCapacity", "type": "INT"},
+          {"name": "registrationCount", "type": "INT"},
+          {"name": "createdAt", "type": "TIMESTAMP"},
+          {"name": "updatedAt", "type": "TIMESTAMP"}
+        ],
+        "indexes": [
+          {"name": "StatusIdx", "type": "NORMAL", "fields": ["status"]},
+          {"name": "MusicTypeIdx", "type": "NORMAL", "fields": ["musicType"]}
+        ]
+      },
+      {
+        "id": "SeatZone",
+        "fields": [
+          {"name": "id", "type": "STRING", "constraints": ["PK"]},
+          {"name": "concertId", "type": "STRING", "constraints": ["notNull", "FK:Concert"]},
+          {"name": "zoneName", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "capacity", "type": "INT", "constraints": ["notNull"]},
+          {"name": "remainingSeats", "type": "INT"},
+          {"name": "price", "type": "FLOAT", "constraints": ["notNull"]},
+          {"name": "sortOrder", "type": "INT"}
+        ],
+        "indexes": [
+          {"name": "ConcertZoneIdx", "type": "NORMAL", "fields": ["concertId"]}
+        ]
+      },
+      {
+        "id": "User",
+        "fields": [
+          {"name": "id", "type": "STRING", "constraints": ["PK"]},
+          {"name": "nickname", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "realName", "type": "STRING"},
+          {"name": "phone", "type": "STRING", "constraints": ["UNIQUE"]},
+          {"name": "email", "type": "STRING"},
+          {"name": "avatarUrl", "type": "STRING"},
+          {"name": "role", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "createdAt", "type": "TIMESTAMP"}
+        ],
+        "indexes": [
+          {"name": "PhoneIdx", "type": "UNIQUE", "fields": ["phone"]},
+          {"name": "RoleIdx", "type": "NORMAL", "fields": ["role"]}
+        ]
+      },
+      {
+        "id": "Registration",
+        "fields": [
+          {"name": "id", "type": "STRING", "constraints": ["PK"]},
+          {"name": "userId", "type": "STRING", "constraints": ["notNull", "FK:User"]},
+          {"name": "concertId", "type": "STRING", "constraints": ["notNull", "FK:Concert"]},
+          {"name": "zoneId", "type": "STRING", "constraints": ["notNull", "FK:SeatZone"]},
+          {"name": "quantity", "type": "INT", "constraints": ["notNull"]},
+          {"name": "totalPrice", "type": "FLOAT", "constraints": ["notNull"]},
+          {"name": "contactName", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "contactPhone", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "contactEmail", "type": "STRING"},
+          {"name": "ticketCode", "type": "STRING", "constraints": ["UNIQUE"]},
+          {"name": "status", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "createdAt", "type": "TIMESTAMP"},
+          {"name": "cancelledAt", "type": "TIMESTAMP"}
+        ],
+        "indexes": [
+          {"name": "UserRegistrationIdx", "type": "NORMAL", "fields": ["userId"]},
+          {"name": "ConcertRegistrationIdx", "type": "NORMAL", "fields": ["concertId"]},
+          {"name": "TicketCodeIdx", "type": "UNIQUE", "fields": ["ticketCode"]}
+        ]
+      },
+      {
+        "id": "Performer",
+        "fields": [
+          {"name": "id", "type": "STRING", "constraints": ["PK"]},
+          {"name": "name", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "avatarUrl", "type": "STRING"},
+          {"name": "bio", "type": "STRING"},
+          {"name": "genre", "type": "STRING"},
+          {"name": "representative", "type": "STRING"},
+          {"name": "createdAt", "type": "TIMESTAMP"}
+        ],
+        "indexes": []
+      },
+      {
+        "id": "ConcertPerformer",
+        "fields": [
+          {"name": "id", "type": "STRING", "constraints": ["PK"]},
+          {"name": "concertId", "type": "STRING", "constraints": ["notNull", "FK:Concert"]},
+          {"name": "performerId", "type": "STRING", "constraints": ["notNull", "FK:Performer"]},
+          {"name": "performOrder", "type": "INT"}
+        ],
+        "indexes": [
+          {"name": "ConcertPerformerIdx", "type": "NORMAL", "fields": ["concertId", "performerId"]}
+        ]
+      },
+      {
+        "id": "Announcement",
+        "fields": [
+          {"name": "id", "type": "STRING", "constraints": ["PK"]},
+          {"name": "title", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "content", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "type", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "concertId", "type": "STRING", "constraints": ["FK:Concert"]},
+          {"name": "status", "type": "STRING", "constraints": ["notNull"]},
+          {"name": "publishedAt", "type": "TIMESTAMP"},
+          {"name": "createdAt", "type": "TIMESTAMP"}
+        ],
+        "indexes": [
+          {"name": "ConcertAnnouncementIdx", "type": "NORMAL", "fields": ["concertId"]},
+          {"name": "StatusTypeIdx", "type": "NORMAL", "fields": ["status", "type"]}
+        ]
+      }
+    ],
+    "relations": [
+      {"from": "SeatZone.concertId", "to": "Concert.id", "type": "n-1"},
+      {"from": "Registration.userId", "to": "User.id", "type": "n-1"},
+      {"from": "Registration.concertId", "to": "Concert.id", "type": "n-1"},
+      {"from": "Registration.zoneId", "to": "SeatZone.id", "type": "n-1"},
+      {"from": "ConcertPerformer.concertId", "to": "Concert.id", "type": "n-1"},
+      {"from": "ConcertPerformer.performerId", "to": "Performer.id", "type": "n-1"},
+      {"from": "Announcement.concertId", "to": "Concert.id", "type": "n-1"}
+    ]
+  },
+  "services": [
+    {
+      "domainId": "Concert",
+      "filePath": "Services/ConcertDomain.vs",
+      "virtualTables": [
+        {
+          "id": "VT_Concert",
+          "source": "Concert",
+          "fields": ["id", "title", "description", "coverImage", "musicType", "venue", "address", "startTime", "endTime", "gateOpenTime", "status", "weatherInfo", "weatherTip", "totalCapacity", "registrationCount", "createdAt", "updatedAt"]
+        },
+        {
+          "id": "VT_SeatZone",
+          "source": "SeatZone",
+          "fields": ["id", "concertId", "zoneName", "capacity", "remainingSeats", "price", "sortOrder"]
+        }
+      ],
+      "methods": [
+        {"id": "listConcerts", "sig": "(page:INT, pageSize:INT)", "out": {"list": "JSON", "total": "INT", "page": "INT"}},
+        {"id": "searchConcerts", "sig": "(keyword:STRING, musicType:STRING, dateStart:STRING, dateEnd:STRING, priceMin:FLOAT, priceMax:FLOAT, page:INT, pageSize:INT)", "out": {"list": "JSON", "total": "INT", "page": "INT"}},
+        {"id": "getConcertDetail", "sig": "(id:STRING)", "out": {"concert": "JSON"}},
+        {"id": "getSeatZones", "sig": "(concertId:STRING)", "out": {"zones": "JSON"}},
+        {"id": "getDashboardStats", "sig": "()", "out": {"totalConcerts": "INT", "totalRegistrations": "INT", "monthlyRevenue": "FLOAT", "upcomingCount": "INT"}},
+        {"id": "getUpcomingConcerts", "sig": "(limit:INT)", "out": {"list": "JSON"}},
+        {"id": "adminListConcerts", "sig": "(status:STRING, page:INT, pageSize:INT)", "out": {"list": "JSON", "total": "INT", "page": "INT"}},
+        {"id": "createConcert", "sig": "(title:STRING, description:STRING, coverImage:STRING, musicType:STRING, venue:STRING, address:STRING, startTime:STRING, endTime:STRING, gateOpenTime:STRING, totalCapacity:INT)", "out": {"concert": "JSON"}},
+        {"id": "updateConcert", "sig": "(id:STRING, title:STRING, description:STRING, coverImage:STRING, musicType:STRING, venue:STRING, address:STRING, startTime:STRING, endTime:STRING, gateOpenTime:STRING)", "out": {"concert": "JSON"}},
+        {"id": "deleteConcert", "sig": "(id:STRING)", "out": {"success": "BOOL"}},
+        {"id": "updateConcertStatus", "sig": "(id:STRING, status:STRING)", "out": {"concert": "JSON"}},
+        {"id": "saveSeatZones", "sig": "(concertId:STRING, zones:JSON)", "out": {"zones": "JSON"}}
+      ]
+    },
+    {
+      "domainId": "Registration",
+      "filePath": "Services/RegistrationDomain.vs",
+      "virtualTables": [
+        {
+          "id": "VT_Registration",
+          "source": "Registration",
+          "fields": ["id", "userId", "concertId", "zoneId", "quantity", "totalPrice", "contactName", "contactPhone", "contactEmail", "ticketCode", "status", "createdAt", "cancelledAt"]
+        }
+      ],
+      "methods": [
+        {"id": "createRegistration", "sig": "(userId:STRING, concertId:STRING, zoneId:STRING, quantity:INT, totalPrice:FLOAT, contactName:STRING, contactPhone:STRING, contactEmail:STRING)", "out": {"registration": "JSON"}},
+        {"id": "getMyRegistrations", "sig": "(userId:STRING)", "out": {"list": "JSON"}},
+        {"id": "cancelRegistration", "sig": "(id:STRING)", "out": {"success": "BOOL"}},
+        {"id": "getTicketDetail", "sig": "(id:STRING)", "out": {"registration": "JSON", "concertTitle": "STRING", "concertStartTime": "STRING", "concertVenue": "STRING", "concertAddress": "STRING", "zoneName": "STRING", "weatherInfo": "STRING", "weatherTip": "STRING"}},
+        {"id": "getRecentRegistrations", "sig": "(limit:INT)", "out": {"list": "JSON"}},
+        {"id": "adminListRegistrations", "sig": "(concertId:STRING, status:STRING, page:INT, pageSize:INT)", "out": {"list": "JSON", "total": "INT", "page": "INT"}},
+        {"id": "exportRegistrations", "sig": "(concertId:STRING, format:STRING)", "out": {"fileUrl": "STRING", "fileName": "STRING"}},
+        {"id": "getRegistrationTrend", "sig": "(dateStart:STRING, dateEnd:STRING, period:STRING)", "out": {"data": "JSON"}},
+        {"id": "getRegistrationsByConcert", "sig": "(limit:INT)", "out": {"data": "JSON"}},
+        {"id": "getRegistrationsByZone", "sig": "(concertId:STRING)", "out": {"data": "JSON"}},
+        {"id": "getRevenueStats", "sig": "(dateStart:STRING, dateEnd:STRING)", "out": {"totalRevenue": "FLOAT", "totalOrders": "INT", "totalTickets": "INT", "averageOrderPrice": "FLOAT", "revenueByMonth": "JSON"}}
+      ]
+    },
+    {
+      "domainId": "Performer",
+      "filePath": "Services/PerformerDomain.vs",
+      "virtualTables": [
+        {
+          "id": "VT_Performer",
+          "source": "Performer",
+          "fields": ["id", "name", "avatarUrl", "bio", "genre", "representative", "createdAt"]
+        },
+        {
+          "id": "VT_ConcertPerformer",
+          "source": "ConcertPerformer",
+          "fields": ["id", "concertId", "performerId", "performOrder"]
+        }
+      ],
+      "methods": [
+        {"id": "listPerformers", "sig": "(keyword:STRING)", "out": {"list": "JSON"}},
+        {"id": "getPerformersByConcert", "sig": "(concertId:STRING)", "out": {"list": "JSON"}},
+        {"id": "createPerformer", "sig": "(name:STRING, avatarUrl:STRING, bio:STRING, genre:STRING, representative:STRING)", "out": {"performer": "JSON"}},
+        {"id": "updatePerformer", "sig": "(id:STRING, name:STRING, avatarUrl:STRING, bio:STRING, genre:STRING, representative:STRING)", "out": {"performer": "JSON"}},
+        {"id": "deletePerformer", "sig": "(id:STRING)", "out": {"success": "BOOL"}}
+      ]
+    },
+    {
+      "domainId": "Announcement",
+      "filePath": "Services/AnnouncementDomain.vs",
+      "virtualTables": [
+        {
+          "id": "VT_Announcement",
+          "source": "Announcement",
+          "fields": ["id", "title", "content", "type", "concertId", "status", "publishedAt", "createdAt"]
+        }
+      ],
+      "methods": [
+        {"id": "getAnnouncements", "sig": "(page:INT, pageSize:INT)", "out": {"list": "JSON", "total": "INT"}},
+        {"id": "adminListAnnouncements", "sig": "(status:STRING, page:INT, pageSize:INT)", "out": {"list": "JSON", "total": "INT"}},
+        {"id": "createAnnouncement", "sig": "(title:STRING, content:STRING, type:STRING, concertId:STRING)", "out": {"announcement": "JSON"}},
+        {"id": "updateAnnouncement", "sig": "(id:STRING, title:STRING, content:STRING, type:STRING, concertId:STRING)", "out": {"announcement": "JSON"}},
+        {"id": "deleteAnnouncement", "sig": "(id:STRING)", "out": {"success": "BOOL"}},
+        {"id": "publishAnnouncement", "sig": "(id:STRING, publish:BOOL)", "out": {"announcement": "JSON"}}
+      ]
+    },
+    {
+      "domainId": "User",
+      "filePath": "Services/UserDomain.vs",
+      "virtualTables": [
+        {
+          "id": "VT_User",
+          "source": "User",
+          "fields": ["id", "nickname", "realName", "phone", "email", "avatarUrl", "role", "createdAt"]
+        }
+      ],
+      "methods": [
+        {"id": "getUserProfile", "sig": "(id:STRING)", "out": {"user": "JSON"}},
+        {"id": "updateUserProfile", "sig": "(id:STRING, nickname:STRING, realName:STRING, phone:STRING, email:STRING, avatarUrl:STRING)", "out": {"user": "JSON"}}
+      ]
+    }
+  ],
+  "components": [
+    {
+      "id": "ConcertCard",
+      "filePath": "ExtComponents/ConcertCard.cp",
+      "description": "音乐会列表卡片，展示封面、标题、日期、场地、票价和天气信息",
+      "props": {
+        "title": "STRING=\"\"",
+        "coverImage": "STRING=\"\"",
+        "dateText": "STRING=\"\"",
+        "venue": "STRING=\"\"",
+        "musicType": "STRING=\"\"",
+        "priceRange": "STRING=\"\"",
+        "weatherIcon": "STRING=\"\"",
+        "weatherTemp": "STRING=\"\"",
+        "registrationCount": "INT=0",
+        "totalCapacity": "INT=0"
+      },
+      "events": ["@tap()"]
+    },
+    {
+      "id": "DataTable",
+      "filePath": "ExtComponents/DataTable.cp",
+      "description": "通用数据表格组件，支持分页和行操作",
+      "props": {
+        "columns": "JSON=[]",
+        "rows": "JSON=[]",
+        "page": "INT=1",
+        "pageSize": "INT=10",
+        "total": "INT=0",
+        "loading": "BOOL=false"
+      },
+      "events": ["@action(actionId:STRING, rowId:STRING)", "@pageChange(page:INT)"]
+    },
+    {
+      "id": "PerformerCard",
+      "filePath": "ExtComponents/PerformerCard.cp",
+      "description": "表演者信息卡片，展示头像、姓名、风格和简介",
+      "props": {
+        "name": "STRING=\"\"",
+        "avatarUrl": "STRING=\"\"",
+        "genre": "STRING=\"\"",
+        "bio": "STRING=\"\"",
+        "representative": "STRING=\"\"",
+        "showActions": "BOOL=false"
+      },
+      "events": ["@tap()", "@edit()", "@delete()"]
+    },
+    {
+      "id": "SeatZoneMap",
+      "filePath": "ExtComponents/SeatZoneMap.cp",
+      "description": "座位区域可视化选择组件，展示场地区域图",
+      "props": {
+        "zones": "JSON=[]",
+        "selectedZoneId": "STRING=\"\"",
+        "disabled": "BOOL=false"
+      },
+      "events": ["@selectZone(zoneId:STRING, zoneName:STRING, price:FLOAT)"]
+    },
+    {
+      "id": "StatCard",
+      "filePath": "ExtComponents/StatCard.cp",
+      "description": "统计数据卡片，展示图标、标题、数值和趋势",
+      "props": {
+        "icon": "STRING=\"\"",
+        "title": "STRING=\"\"",
+        "value": "STRING=\"0\"",
+        "unit": "STRING=\"\"",
+        "trend": "STRING=\"up\"",
+        "trendValue": "STRING=\"\"",
+        "bgColor": "STRING=\"#6366f1\""
+      },
+      "events": ["@tap()"]
+    },
+    {
+      "id": "StatusTag",
+      "filePath": "ExtComponents/StatusTag.cp",
+      "description": "状态标签组件，支持不同颜色类型",
+      "props": {
+        "text": "STRING=\"\"",
+        "colorType": "STRING=\"default\""
+      },
+      "events": []
+    },
+    {
+      "id": "TicketQrCode",
+      "filePath": "ExtComponents/TicketQrCode.cp",
+      "description": "电子票二维码组件，展示票面信息和QR码",
+      "props": {
+        "ticketCode": "STRING=\"\"",
+        "concertTitle": "STRING=\"\"",
+        "dateText": "STRING=\"\"",
+        "venue": "STRING=\"\"",
+        "zoneName": "STRING=\"\"",
+        "quantity": "INT=1",
+        "status": "STRING=\"confirmed\""
+      },
+      "events": ["@save()"]
+    },
+    {
+      "id": "WeatherBadge",
+      "filePath": "ExtComponents/WeatherBadge.cp",
+      "description": "天气徽章组件，展示天气图标、温度和建议",
+      "props": {
+        "weatherIcon": "STRING=\"sun\"",
+        "temperature": "STRING=\"\"",
+        "description": "STRING=\"\"",
+        "showTip": "BOOL=false",
+        "tip": "STRING=\"\""
+      },
+      "events": ["@tap()"]
+    }
+  ],
+  "sections": [
+    {
+      "id": "ConcertList",
+      "filePath": "Sections/ConcertList.sc",
+      "type": "main",
+      "description": "音乐会列表页，支持搜索、筛选和分页浏览",
+      "consumesServices": ["Concert.listConcerts", "Concert.searchConcerts"],
+      "keyStates": {
+        "concertList": "JSON",
+        "keyword": "STRING",
+        "musicType": "STRING",
+        "page": "INT",
+        "total": "INT",
+        "loading": "BOOL",
+        "showFilter": "BOOL"
+      },
+      "usesComponents": ["ConcertCard"]
+    },
+    {
+      "id": "ConcertDetail",
+      "filePath": "Sections/ConcertDetail.sc",
+      "type": "main",
+      "description": "音乐会详情页，展示完整信息、表演者和天气提醒",
+      "consumesServices": ["Concert.getConcertDetail", "Performer.getPerformersByConcert", "Concert.getSeatZones"],
+      "keyStates": {
+        "concertId": "STRING",
+        "concert": "JSON",
+        "performers": "JSON",
+        "seatZones": "JSON",
+        "loading": "BOOL"
+      },
+      "usesComponents": ["WeatherBadge"]
+    },
+    {
+      "id": "SeatSelection",
+      "filePath": "Sections/SeatSelection.sc",
+      "type": "main",
+      "description": "座位区域选择页，可视化选座和价格计算",
+      "consumesServices": ["Concert.getSeatZones"],
+      "keyStates": {
+        "concertId": "STRING",
+        "seatZones": "JSON",
+        "selectedZoneId": "STRING",
+        "quantity": "INT",
+        "totalPrice": "FLOAT",
+        "loading": "BOOL"
+      },
+      "usesComponents": ["SeatZoneMap"]
+    },
+    {
+      "id": "RegistrationConfirm",
+      "filePath": "Sections/RegistrationConfirm.sc",
+      "type": "main",
+      "description": "报名确认页，填写联系信息并提交报名",
+      "consumesServices": ["Registration.createRegistration"],
+      "keyStates": {
+        "concertId": "STRING",
+        "zoneId": "STRING",
+        "quantity": "INT",
+        "totalPrice": "FLOAT",
+        "contactName": "STRING",
+        "contactPhone": "STRING",
+        "submitting": "BOOL",
+        "submitSuccess": "BOOL"
+      },
+      "usesComponents": []
+    },
+    {
+      "id": "MyRegistrations",
+      "filePath": "Sections/MyRegistrations.sc",
+      "type": "main",
+      "description": "我的报名记录页，支持查看电子票和取消报名",
+      "consumesServices": ["Registration.getMyRegistrations", "Registration.cancelRegistration"],
+      "keyStates": {
+        "registrationList": "JSON",
+        "activeTab": "STRING",
+        "loading": "BOOL"
+      },
+      "usesComponents": ["StatusTag"]
+    },
+    {
+      "id": "TicketView",
+      "filePath": "Sections/TicketView.sc",
+      "type": "main",
+      "description": "电子票详情页，展示QR码和入场信息",
+      "consumesServices": ["Registration.getTicketDetail"],
+      "keyStates": {
+        "registrationId": "STRING",
+        "ticketDetail": "JSON",
+        "loading": "BOOL"
+      },
+      "usesComponents": ["TicketQrCode", "WeatherBadge"]
+    },
+    {
+      "id": "AnnouncementList",
+      "filePath": "Sections/AnnouncementList.sc",
+      "type": "main",
+      "description": "公告通知列表页，展示紧急和普通公告",
+      "consumesServices": ["Announcement.getAnnouncements"],
+      "keyStates": {
+        "announcements": "JSON",
+        "loading": "BOOL"
+      },
+      "usesComponents": []
+    },
+    {
+      "id": "UserProfile",
+      "filePath": "Sections/UserProfile.sc",
+      "type": "main",
+      "description": "个人中心页，用户信息和设置",
+      "consumesServices": ["User.getUserProfile"],
+      "keyStates": {
+        "userId": "STRING",
+        "userInfo": "JSON",
+        "loading": "BOOL"
+      },
+      "usesComponents": []
+    }
+  ],
+  "apps": [
+    {
+      "id": "ConcertApp",
+      "filePath": "Apps/ConcertApp.vx",
+      "device": "MOBILE",
+      "resolution": "390x844",
+      "description": "用户端应用，提供音乐会浏览、报名购票、电子票查看等功能",
+      "globalVars": {
+        "currentUserId": "STRING=\"user001\"",
+        "currentUserName": "STRING=\"音乐爱好者\""
+      },
+      "pages": [
+        {
+          "id": "ConcertList",
+          "route": "/concerts",
+          "layout": [{"ref": "ConcertList"}]
+        },
+        {
+          "id": "ConcertDetail",
+          "route": "/concert/:concertId",
+          "layout": [{"ref": "ConcertDetail"}]
+        },
+        {
+          "id": "SeatSelection",
+          "route": "/concert/:concertId/seat",
+          "layout": [{"ref": "SeatSelection"}]
+        },
+        {
+          "id": "RegistrationConfirm",
+          "route": "/concert/:concertId/confirm",
+          "layout": [{"ref": "RegistrationConfirm"}]
+        },
+        {
+          "id": "MyRegistrations",
+          "route": "/my-registrations",
+          "layout": [{"ref": "MyRegistrations"}]
+        },
+        {
+          "id": "TicketView",
+          "route": "/ticket/:registrationId",
+          "layout": [{"ref": "TicketView"}]
+        },
+        {
+          "id": "AnnouncementList",
+          "route": "/announcements",
+          "layout": [{"ref": "AnnouncementList"}]
+        },
+        {
+          "id": "UserProfile",
+          "route": "/profile",
+          "layout": [{"ref": "UserProfile"}]
+        }
+      ],
+      "navigation": {
+        "type": "TabBar",
+        "tabs": [
+          {"label": "音乐会", "icon": "music", "section": "ConcertList"},
+          {"label": "公告", "icon": "notification", "section": "AnnouncementList"},
+          {"label": "我的报名", "icon": "ticket", "section": "MyRegistrations"},
+          {"label": "我的", "icon": "user", "section": "UserProfile"}
+        ]
+      },
+      "_version": "2.91"
+    }
+  ]
+}

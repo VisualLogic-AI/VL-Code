@@ -1,0 +1,14 @@
+{
+  "naming": {
+    "files": "PascalCase (e.g. MyComponent.cp, UserDomain.vs)",
+    "variables": "camelCase with $ prefix (e.g. $userName)",
+    "methods": "camelCase (e.g. getUser, loadData)",
+    "events": "camelCase with @ prefix (e.g. @onSelect, @onSubmit)",
+    "localVars": "_prefix (e.g. _idx, _temp)",
+    "themeTokens": "--prefix (e.g. --colorBrandPrimary)"
+  },
+  "indentation": "dash (-) symbols, NOT spaces",
+  "version": "// VL_VERSION:2.91 (required header)",
+  "noEscapeChars": true,
+  "semicolonsOnlyInFor": true
+}

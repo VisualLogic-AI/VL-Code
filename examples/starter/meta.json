@@ -1,0 +1,8 @@
+{
+  "name": "starter",
+  "version": "2.91",
+  "type": "vl-project",
+  "description": "Minimal VL starter project",
+  "apps": ["MyApp"],
+  "theme": "Theme-Default"
+}

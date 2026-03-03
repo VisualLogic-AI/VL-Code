@@ -1,0 +1,29 @@
+// VL_VERSION:2.91
+
+# App Config
+APP ConcertApp
+--title: 露天音乐会
+--description: 用户端应用，提供音乐会浏览、报名购票、电子票查看等功能
+--theme: Theme-Default
+
+# App Variables
+$currentUserId(STRING) = "user001"
+$currentUserName(STRING) = "音乐爱好者"
+
+# Navigation
+NAV TabBar
+--TAB 音乐会 icon:music section:ConcertList
+--TAB 公告 icon:notification section:AnnouncementList
+--TAB 我的报名 icon:ticket section:MyRegistrations
+--TAB 我的 icon:user section:UserProfile
+
+# Routes
+ROUTE /concerts section:ConcertList
+ROUTE /concert/:concertId section:ConcertDetail
+ROUTE /concert/:concertId/seat section:SeatSelection
+ROUTE /concert/:concertId/confirm section:RegistrationConfirm
+ROUTE /my-registrations section:MyRegistrations
+ROUTE /ticket/:registrationId section:TicketView
+ROUTE /announcements section:AnnouncementList
+ROUTE /favorites section:FavoriteList
+ROUTE /profile section:UserProfile

@@ -1,0 +1,137 @@
+{
+  "version": "3.13",
+  "name": "IncrementalUpdate",
+  "registry": {
+    "params": [
+      "changeRequest(STRING)",
+      "currentMeta(OBJECT)"
+    ],
+    "services": [],
+    "apis": [],
+    "components": [],
+    "vars": [
+      "$updatedMeta(OBJECT)",
+      "$metaDiff(OBJECT)",
+      "$affectedFiles(OBJECT)",
+      "$regeneratedFiles(OBJECT)"
+    ],
+    "files": {
+      "inputs": [
+        ".vl-code/ProjectMeta.json"
+      ],
+      "artifacts": [
+        "Services/*",
+        "Sections/*",
+        "ExtComponents/*",
+        "Apps/*"
+      ]
+    },
+    "docs": {
+      "1": "VL Syntax Rules",
+      "50": "Incremental-Update-Metadata-Prompt",
+      "51": "Incremental-Update-Diff-Prompt",
+      "52": "Incremental-Regen-Prompt"
+    }
+  },
+  "steps": [
+    {
+      "id": "LLM_010_AnalyzeMeta",
+      "meta": {
+        "title": "Analyze current metadata + change request"
+      },
+      "in": {
+        "docs": ["1", "50"],
+        "max_tokens": 8192,
+        "messages": [
+          { "role": "user", "content": "Current ProjectMeta:" },
+          { "role": "user", "content": "=currentMeta" },
+          { "role": "user", "content": "Change Request:" },
+          { "role": "user", "content": "=changeRequest" }
+        ],
+        "output_config": { "format": { "type": "json_object" } }
+      },
+      "out": {
+        "$updatedMeta": "=_result"
+      },
+      "next": "LLM_020_DiffMeta"
+    },
+    {
+      "id": "LLM_020_DiffMeta",
+      "meta": {
+        "title": "Compute metadata diff + identify affected files"
+      },
+      "in": {
+        "docs": ["51"],
+        "max_tokens": 4096,
+        "messages": [
+          { "role": "user", "content": "Old metadata:" },
+          { "role": "user", "content": "=currentMeta" },
+          { "role": "user", "content": "New metadata:" },
+          { "role": "user", "content": "=$updatedMeta" }
+        ],
+        "output_config": { "format": { "type": "json_object" } }
+      },
+      "out": {
+        "$metaDiff": "=_result",
+        "$affectedFiles": "=_result.affectedFiles",
+        "/.vl-code/ProjectMeta.json": "=$updatedMeta"
+      },
+      "next": "Loop_RegenFiles"
+    },
+    {
+      "id": "Loop_RegenFiles",
+      "meta": {
+        "title": "Regenerate affected VL files"
+      },
+      "source": "=$affectedFiles",
+      "mode": "parallel",
+      "children": ["LLM_030_RegenFile"],
+      "next": "LLM_040_Validate"
+    },
+    {
+      "id": "LLM_030_RegenFile",
+      "meta": {
+        "title": "Regenerate single VL file"
+      },
+      "in": {
+        "docs": ["1", "52"],
+        "stream": true,
+        "max_tokens": 16000,
+        "messages": [
+          { "role": "user", "content": "File to regenerate:" },
+          { "role": "user", "content": "=_item" },
+          { "role": "user", "content": "Updated metadata:" },
+          { "role": "user", "content": "=$updatedMeta" },
+          { "role": "user", "content": "Change context:" },
+          { "role": "user", "content": "=$metaDiff" }
+        ]
+      },
+      "out": {
+        "/{_item.filePath}": "=_result"
+      },
+      "next": "RETURN"
+    },
+    {
+      "id": "LLM_040_Validate",
+      "meta": {
+        "title": "Validate regenerated files"
+      },
+      "in": {
+        "docs": ["1"],
+        "max_tokens": 4096,
+        "messages": [
+          { "role": "user", "content": "Validate the following regenerated files for VL 2.91 syntax compliance. List any issues found." },
+          { "role": "user", "content": "=$affectedFiles" }
+        ]
+      },
+      "out": {},
+      "next": "Stop_Done"
+    },
+    {
+      "id": "Stop_Done",
+      "meta": {
+        "title": "Incremental update complete"
+      }
+    }
+  ]
+}

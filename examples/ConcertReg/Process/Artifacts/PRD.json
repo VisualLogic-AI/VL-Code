@@ -1,0 +1,460 @@
+{
+  "projectName": "ConcertReg",
+  "description": "露天音乐会报名系统，支持用户浏览音乐会、在线报名购票、查看电子票二维码，以及管理端创建活动、管理报名和发布公告。多端响应式布局，包含天气提醒、座位区域选择等露天音乐会特色功能。",
+  "targetLang": "zh-CN",
+  "roles": [
+    {
+      "id": "user",
+      "name": "普通用户",
+      "description": "浏览音乐会列表、查看详情、在线报名购票、管理个人报名记录"
+    },
+    {
+      "id": "admin",
+      "name": "管理员",
+      "description": "创建和管理音乐会活动、管理报名名单、查看统计数据、发布公告通知"
+    }
+  ],
+  "apps": [
+    {
+      "id": "ConcertApp",
+      "name": "ConcertApp",
+      "role": "user",
+      "description": "用户端应用，提供音乐会浏览、报名购票、电子票查看等功能",
+      "pages": [
+        "ConcertList",
+        "ConcertDetail",
+        "SeatSelection",
+        "RegistrationConfirm",
+        "MyRegistrations",
+        "TicketView",
+        "AnnouncementList",
+        "UserProfile"
+      ]
+    },
+    {
+      "id": "ConcertAdmin",
+      "name": "ConcertAdmin",
+      "role": "admin",
+      "description": "管理端应用，提供音乐会活动管理、报名管理、数据统计和公告发布功能",
+      "pages": [
+        "AdminDashboard",
+        "ConcertManage",
+        "ConcertForm",
+        "RegistrationManage",
+        "PerformerManage",
+        "AnnouncementManage",
+        "Statistics"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "id": "ConcertList",
+      "name": "音乐会列表",
+      "description": "展示所有即将举办的露天音乐会，支持按日期、地点、类型筛选，显示天气预报提醒",
+      "features": [
+        "音乐会卡片列表展示，包含封面图、名称、时间、地点、票价范围",
+        "顶部搜索栏支持关键词搜索",
+        "筛选器：按日期范围、地点区域、音乐类型、票价区间筛选",
+        "天气图标提醒：每个音乐会卡片显示当天天气状况",
+        "下拉刷新和滚动加载更多",
+        "响应式布局：移动端单列卡片、桌面端网格布局"
+      ]
+    },
+    {
+      "id": "ConcertDetail",
+      "name": "音乐会详情",
+      "description": "展示音乐会完整信息，包含表演者介绍、场地地图、天气提醒和报名入口",
+      "features": [
+        "顶部大图横幅展示音乐会海报",
+        "基本信息区：名称、日期时间、地点地址、音乐类型",
+        "表演者列表：头像、姓名、简介、代表作品",
+        "票价信息区：不同座位区域对应不同票价",
+        "天气详情提醒：温度、降水概率、穿衣建议",
+        "场地座位区域示意图预览",
+        "立即报名按钮跳转至座位选择页",
+        "分享按钮"
+      ]
+    },
+    {
+      "id": "SeatSelection",
+      "name": "座位区域选择",
+      "description": "展示露天音乐会场地座位区域图，用户选择偏好区域并确认座位数量",
+      "features": [
+        "场地座位区域可视化示意图（VIP区、前排区、中间区、草坪区等）",
+        "各区域显示剩余座位数和对应票价",
+        "点击区域高亮选中，显示区域详情",
+        "选择购票数量（1-5张）",
+        "价格实时计算显示",
+        "确认选择按钮跳转至报名确认页"
+      ]
+    },
+    {
+      "id": "RegistrationConfirm",
+      "name": "报名确认",
+      "description": "确认报名信息并提交，填写联系方式，完成报名流程",
+      "features": [
+        "订单摘要：音乐会名称、时间、座位区域、数量、总价",
+        "联系人信息表单：姓名、手机号、邮箱",
+        "温馨提示：露天活动注意事项、退票规则",
+        "确认提交按钮",
+        "提交成功后显示电子票二维码预览",
+        "跳转至我的报名记录"
+      ]
+    },
+    {
+      "id": "MyRegistrations",
+      "name": "我的报名",
+      "description": "展示用户所有报名记录，支持查看电子票和取消报名",
+      "features": [
+        "报名记录列表：按时间倒序排列",
+        "每条记录显示：音乐会名称、时间、座位区域、状态标签（已确认/已取消/已完成）",
+        "点击查看电子票二维码",
+        "取消报名按钮（仅限活动开始前48小时）",
+        "历史记录和即将参加的分类标签切换",
+        "空状态引导去浏览音乐会"
+      ]
+    },
+    {
+      "id": "TicketView",
+      "name": "电子票详情",
+      "description": "展示电子票二维码及入场信息，支持离线查看",
+      "features": [
+        "大尺寸二维码展示，用于入场扫描",
+        "票面信息：音乐会名称、日期时间、座位区域、票号",
+        "入场须知：入场时间、禁止携带物品等",
+        "当天天气提醒和穿衣建议",
+        "保存至相册按钮"
+      ]
+    },
+    {
+      "id": "AnnouncementList",
+      "name": "公告通知",
+      "description": "展示音乐会相关公告通知，如天气变更、时间调整等",
+      "features": [
+        "公告列表：标题、摘要、发布时间",
+        "紧急公告顶部置顶高亮显示",
+        "点击展开查看公告全文",
+        "按音乐会筛选相关公告",
+        "未读公告红点标记"
+      ]
+    },
+    {
+      "id": "UserProfile",
+      "name": "个人中心",
+      "description": "用户个人信息管理和应用设置",
+      "features": [
+        "用户头像和昵称展示",
+        "个人信息编辑：姓名、手机号、邮箱",
+        "我的报名快捷入口及报名数统计",
+        "消息通知设置",
+        "关于与帮助"
+      ]
+    },
+    {
+      "id": "AdminDashboard",
+      "name": "管理首页",
+      "description": "管理端仪表盘，展示关键运营数据概览",
+      "features": [
+        "数据卡片：总音乐会数、总报名人数、本月收入、待举办活动数",
+        "近期音乐会列表及报名进度条",
+        "最新报名动态时间线",
+        "快捷操作入口：创建音乐会、发布公告",
+        "响应式布局适配桌面和移动端"
+      ]
+    },
+    {
+      "id": "ConcertManage",
+      "name": "音乐会管理",
+      "description": "管理所有音乐会活动，支持增删改查操作",
+      "features": [
+        "音乐会列表表格：名称、日期、地点、状态、报名人数",
+        "状态筛选：全部/草稿/已发布/已结束",
+        "搜索音乐会",
+        "新建音乐会按钮",
+        "编辑/删除操作按钮",
+        "批量操作：批量发布、批量删除"
+      ]
+    },
+    {
+      "id": "ConcertForm",
+      "name": "音乐会编辑",
+      "description": "创建或编辑音乐会活动的表单页面",
+      "features": [
+        "基本信息表单：名称、描述、音乐类型、封面图上传",
+        "时间设置：开始时间、结束时间、入场时间",
+        "地点信息：场地名称、详细地址",
+        "座位区域配置：添加多个区域，设置名称、容量、票价",
+        "表演者关联：从表演者库选择或新增表演者",
+        "发布设置：保存草稿或直接发布",
+        "表单校验和保存反馈"
+      ]
+    },
+    {
+      "id": "RegistrationManage",
+      "name": "报名管理",
+      "description": "管理所有报名记录，支持查看、筛选和导出",
+      "features": [
+        "报名记录表格：报名者、音乐会、座位区域、数量、状态、时间",
+        "按音乐会筛选报名记录",
+        "按状态筛选：已确认/已取消",
+        "搜索报名者姓名或手机号",
+        "导出报名名单",
+        "手动取消报名操作"
+      ]
+    },
+    {
+      "id": "PerformerManage",
+      "name": "表演者管理",
+      "description": "管理表演者信息库",
+      "features": [
+        "表演者列表：头像、姓名、风格类型、参演次数",
+        "新增表演者表单：姓名、简介、头像上传、风格标签、代表作品",
+        "编辑和删除表演者",
+        "搜索表演者"
+      ]
+    },
+    {
+      "id": "AnnouncementManage",
+      "name": "公告管理",
+      "description": "创建和管理公告通知",
+      "features": [
+        "公告列表：标题、关联音乐会、类型、发布状态、时间",
+        "新建公告表单：标题、内容、类型（普通/紧急）、关联音乐会",
+        "编辑和删除公告",
+        "发布/撤回公告操作"
+      ]
+    },
+    {
+      "id": "Statistics",
+      "name": "数据统计",
+      "description": "报名数据统计分析，图表可视化",
+      "features": [
+        "报名趋势折线图：按日/周/月查看",
+        "各音乐会报名人数柱状图",
+        "座位区域偏好分布饼图",
+        "收入统计汇总",
+        "日期范围选择器",
+        "数据导出功能"
+      ]
+    }
+  ],
+  "valueDomains": [
+    "Concert",
+    "Registration",
+    "User",
+    "Performer",
+    "Announcement"
+  ],
+  "dataModel": {
+    "Concert": {
+      "fields": [
+        { "name": "id", "type": "STRING", "description": "音乐会唯一标识", "constraints": ["PK"] },
+        { "name": "title", "type": "STRING", "description": "音乐会名称", "constraints": ["REQUIRED"] },
+        { "name": "description", "type": "STRING", "description": "音乐会详细描述", "constraints": [] },
+        { "name": "coverImage", "type": "STRING", "description": "封面海报图片URL", "constraints": [] },
+        { "name": "musicType", "type": "STRING", "description": "音乐类型（流行/摇滚/古典/民谣/电子/爵士）", "constraints": ["REQUIRED"] },
+        { "name": "venue", "type": "STRING", "description": "场地名称", "constraints": ["REQUIRED"] },
+        { "name": "address", "type": "STRING", "description": "场地详细地址", "constraints": ["REQUIRED"] },
+        { "name": "startTime", "type": "TIMESTAMP", "description": "演出开始时间", "constraints": ["REQUIRED"] },
+        { "name": "endTime", "type": "TIMESTAMP", "description": "演出结束时间", "constraints": ["REQUIRED"] },
+        { "name": "gateOpenTime", "type": "TIMESTAMP", "description": "入场开放时间", "constraints": [] },
+        { "name": "status", "type": "STRING", "description": "状态：draft/published/cancelled/finished", "constraints": ["REQUIRED"] },
+        { "name": "weatherInfo", "type": "STRING", "description": "天气预报信息（JSON格式：温度、天气、降水概率）", "constraints": [] },
+        { "name": "weatherTip", "type": "STRING", "description": "天气穿衣建议和注意事项", "constraints": [] },
+        { "name": "totalCapacity", "type": "INT", "description": "总容量（所有区域座位数之和）", "constraints": [] },
+        { "name": "registrationCount", "type": "INT", "description": "已报名人数", "constraints": [] },
+        { "name": "createdAt", "type": "TIMESTAMP", "description": "创建时间", "constraints": [] },
+        { "name": "updatedAt", "type": "TIMESTAMP", "description": "更新时间", "constraints": [] }
+      ]
+    },
+    "SeatZone": {
+      "fields": [
+        { "name": "id", "type": "STRING", "description": "座位区域唯一标识", "constraints": ["PK"] },
+        { "name": "concertId", "type": "STRING", "description": "所属音乐会ID", "constraints": ["FK:Concert", "REQUIRED"] },
+        { "name": "zoneName", "type": "STRING", "description": "区域名称（VIP区/前排区/中间区/草坪区）", "constraints": ["REQUIRED"] },
+        { "name": "capacity", "type": "INT", "description": "该区域总座位数", "constraints": ["REQUIRED"] },
+        { "name": "remainingSeats", "type": "INT", "description": "剩余座位数", "constraints": [] },
+        { "name": "price", "type": "FLOAT", "description": "该区域票价（元）", "constraints": ["REQUIRED"] },
+        { "name": "sortOrder", "type": "INT", "description": "排序序号", "constraints": [] }
+      ]
+    },
+    "User": {
+      "fields": [
+        { "name": "id", "type": "STRING", "description": "用户唯一标识", "constraints": ["PK"] },
+        { "name": "nickname", "type": "STRING", "description": "用户昵称", "constraints": ["REQUIRED"] },
+        { "name": "realName", "type": "STRING", "description": "真实姓名", "constraints": [] },
+        { "name": "phone", "type": "STRING", "description": "手机号码", "constraints": ["UNIQUE"] },
+        { "name": "email", "type": "STRING", "description": "邮箱地址", "constraints": [] },
+        { "name": "avatarUrl", "type": "STRING", "description": "头像URL", "constraints": [] },
+        { "name": "role", "type": "STRING", "description": "角色：user/admin", "constraints": ["REQUIRED"] },
+        { "name": "createdAt", "type": "TIMESTAMP", "description": "注册时间", "constraints": [] }
+      ]
+    },
+    "Registration": {
+      "fields": [
+        { "name": "id", "type": "STRING", "description": "报名记录唯一标识", "constraints": ["PK"] },
+        { "name": "userId", "type": "STRING", "description": "报名用户ID", "constraints": ["FK:User", "REQUIRED"] },
+        { "name": "concertId", "type": "STRING", "description": "音乐会ID", "constraints": ["FK:Concert", "REQUIRED"] },
+        { "name": "zoneId", "type": "STRING", "description": "座位区域ID", "constraints": ["FK:SeatZone", "REQUIRED"] },
+        { "name": "quantity", "type": "INT", "description": "购票数量（1-5）", "constraints": ["REQUIRED"] },
+        { "name": "totalPrice", "type": "FLOAT", "description": "总金额（元）", "constraints": ["REQUIRED"] },
+        { "name": "contactName", "type": "STRING", "description": "联系人姓名", "constraints": ["REQUIRED"] },
+        { "name": "contactPhone", "type": "STRING", "description": "联系人手机号", "constraints": ["REQUIRED"] },
+        { "name": "contactEmail", "type": "STRING", "description": "联系人邮箱", "constraints": [] },
+        { "name": "ticketCode", "type": "STRING", "description": "电子票二维码编码", "constraints": ["UNIQUE"] },
+        { "name": "status", "type": "STRING", "description": "状态：confirmed/cancelled/used", "constraints": ["REQUIRED"] },
+        { "name": "createdAt", "type": "TIMESTAMP", "description": "报名时间", "constraints": [] },
+        { "name": "cancelledAt", "type": "TIMESTAMP", "description": "取消时间", "constraints": [] }
+      ]
+    },
+    "Performer": {
+      "fields": [
+        { "name": "id", "type": "STRING", "description": "表演者唯一标识", "constraints": ["PK"] },
+        { "name": "name", "type": "STRING", "description": "表演者姓名/乐队名", "constraints": ["REQUIRED"] },
+        { "name": "avatarUrl", "type": "STRING", "description": "表演者头像URL", "constraints": [] },
+        { "name": "bio", "type": "STRING", "description": "表演者简介", "constraints": [] },
+        { "name": "genre", "type": "STRING", "description": "风格标签（流行/摇滚/民谣等）", "constraints": [] },
+        { "name": "representative", "type": "STRING", "description": "代表作品", "constraints": [] },
+        { "name": "createdAt", "type": "TIMESTAMP", "description": "创建时间", "constraints": [] }
+      ]
+    },
+    "ConcertPerformer": {
+      "fields": [
+        { "name": "id", "type": "STRING", "description": "关联记录唯一标识", "constraints": ["PK"] },
+        { "name": "concertId", "type": "STRING", "description": "音乐会ID", "constraints": ["FK:Concert", "REQUIRED"] },
+        { "name": "performerId", "type": "STRING", "description": "表演者ID", "constraints": ["FK:Performer", "REQUIRED"] },
+        { "name": "performOrder", "type": "INT", "description": "演出顺序", "constraints": [] }
+      ]
+    },
+    "Announcement": {
+      "fields": [
+        { "name": "id", "type": "STRING", "description": "公告唯一标识", "constraints": ["PK"] },
+        { "name": "title", "type": "STRING", "description": "公告标题", "constraints": ["REQUIRED"] },
+        { "name": "content", "type": "STRING", "description": "公告正文内容", "constraints": ["REQUIRED"] },
+        { "name": "type", "type": "STRING", "description": "公告类型：normal/urgent", "constraints": ["REQUIRED"] },
+        { "name": "concertId", "type": "STRING", "description": "关联音乐会ID（可选，为空则为全局公告）", "constraints": ["FK:Concert"] },
+        { "name": "status", "type": "STRING", "description": "状态：draft/published/withdrawn", "constraints": ["REQUIRED"] },
+        { "name": "publishedAt", "type": "TIMESTAMP", "description": "发布时间", "constraints": [] },
+        { "name": "createdAt", "type": "TIMESTAMP", "description": "创建时间", "constraints": [] }
+      ]
+    }
+  },
+  "wiring": [
+    {
+      "pageId": "ConcertList",
+      "services": [
+        { "domain": "Concert", "method": "listConcerts", "trigger": "页面加载时获取已发布的音乐会列表" },
+        { "domain": "Concert", "method": "searchConcerts", "trigger": "用户输入关键词搜索或切换筛选条件时" }
+      ]
+    },
+    {
+      "pageId": "ConcertDetail",
+      "services": [
+        { "domain": "Concert", "method": "getConcertDetail", "trigger": "页面加载时根据ID获取音乐会详情" },
+        { "domain": "Performer", "method": "getPerformersByConcert", "trigger": "页面加载时获取该音乐会的表演者列表" },
+        { "domain": "Concert", "method": "getSeatZones", "trigger": "页面加载时获取座位区域和票价信息" }
+      ]
+    },
+    {
+      "pageId": "SeatSelection",
+      "services": [
+        { "domain": "Concert", "method": "getSeatZones", "trigger": "页面加载时获取座位区域、剩余座位和票价" }
+      ]
+    },
+    {
+      "pageId": "RegistrationConfirm",
+      "services": [
+        { "domain": "Registration", "method": "createRegistration", "trigger": "用户确认提交报名表单时" }
+      ]
+    },
+    {
+      "pageId": "MyRegistrations",
+      "services": [
+        { "domain": "Registration", "method": "getMyRegistrations", "trigger": "页面加载时获取当前用户的报名记录" },
+        { "domain": "Registration", "method": "cancelRegistration", "trigger": "用户点击取消报名按钮时" }
+      ]
+    },
+    {
+      "pageId": "TicketView",
+      "services": [
+        { "domain": "Registration", "method": "getTicketDetail", "trigger": "页面加载时根据报名ID获取电子票信息" }
+      ]
+    },
+    {
+      "pageId": "AnnouncementList",
+      "services": [
+        { "domain": "Announcement", "method": "listAnnouncements", "trigger": "页面加载时获取已发布的公告列表" }
+      ]
+    },
+    {
+      "pageId": "UserProfile",
+      "services": [
+        { "domain": "User", "method": "getUserProfile", "trigger": "页面加载时获取当前用户个人信息" },
+        { "domain": "User", "method": "updateUserProfile", "trigger": "用户编辑保存个人信息时" }
+      ]
+    },
+    {
+      "pageId": "AdminDashboard",
+      "services": [
+        { "domain": "Concert", "method": "getDashboardStats", "trigger": "页面加载时获取仪表盘统计数据" },
+        { "domain": "Registration", "method": "getRecentRegistrations", "trigger": "页面加载时获取最新报名动态" },
+        { "domain": "Concert", "method": "getUpcomingConcerts", "trigger": "页面加载时获取近期音乐会列表" }
+      ]
+    },
+    {
+      "pageId": "ConcertManage",
+      "services": [
+        { "domain": "Concert", "method": "listAllConcerts", "trigger": "页面加载时获取所有音乐会（含草稿）" },
+        { "domain": "Concert", "method": "deleteConcert", "trigger": "管理员点击删除按钮时" },
+        { "domain": "Concert", "method": "updateConcertStatus", "trigger": "管理员批量发布或更改状态时" }
+      ]
+    },
+    {
+      "pageId": "ConcertForm",
+      "services": [
+        { "domain": "Concert", "method": "getConcertDetail", "trigger": "编辑模式下页面加载时获取音乐会数据" },
+        { "domain": "Concert", "method": "createConcert", "trigger": "管理员提交新建音乐会表单时" },
+        { "domain": "Concert", "method": "updateConcert", "trigger": "管理员提交编辑音乐会表单时" },
+        { "domain": "Performer", "method": "listPerformers", "trigger": "加载表演者下拉选择列表时" },
+        { "domain": "Concert", "method": "saveSeatZones", "trigger": "保存座位区域配置时" }
+      ]
+    },
+    {
+      "pageId": "RegistrationManage",
+      "services": [
+        { "domain": "Registration", "method": "listAllRegistrations", "trigger": "页面加载时获取所有报名记录" },
+        { "domain": "Registration", "method": "cancelRegistration", "trigger": "管理员手动取消报名时" },
+        { "domain": "Registration", "method": "exportRegistrations", "trigger": "管理员点击导出按钮时" }
+      ]
+    },
+    {
+      "pageId": "PerformerManage",
+      "services": [
+        { "domain": "Performer", "method": "listPerformers", "trigger": "页面加载时获取所有表演者" },
+        { "domain": "Performer", "method": "createPerformer", "trigger": "管理员提交新增表演者表单时" },
+        { "domain": "Performer", "method": "updatePerformer", "trigger": "管理员提交编辑表演者表单时" },
+        { "domain": "Performer", "method": "deletePerformer", "trigger": "管理员点击删除表演者按钮时" }
+      ]
+    },
+    {
+      "pageId": "AnnouncementManage",
+      "services": [
+        { "domain": "Announcement", "method": "listAllAnnouncements", "trigger": "页面加载时获取所有公告" },
+        { "domain": "Announcement", "method": "createAnnouncement", "trigger": "管理员提交新建公告表单时" },
+        { "domain": "Announcement", "method": "updateAnnouncement", "trigger": "管理员提交编辑公告表单时" },
+        { "domain": "Announcement", "method": "deleteAnnouncement", "trigger": "管理员点击删除公告按钮时" },
+        { "domain": "Announcement", "method": "togglePublish", "trigger": "管理员发布或撤回公告时" }
+      ]
+    },
+    {
+      "pageId": "Statistics",
+      "services": [
+        { "domain": "Registration", "method": "getRegistrationTrend", "trigger": "页面加载时获取报名趋势数据" },
+        { "domain": "Registration", "method": "getRegistrationByConcert", "trigger": "页面加载时获取各音乐会报名统计" },
+        { "domain": "Registration", "method": "getZoneDistribution", "trigger": "页面加载时获取座位区域偏好分布" },
+        { "domain": "Registration", "method": "getRevenueStats", "trigger": "页面加载时获取收入统计数据" }
+      ]
+    }
+  ]
+}

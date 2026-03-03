@@ -1,0 +1,362 @@
+{
+  "specVersion": "ProjectMeta/1.0",
+  "projectName": "SmartCampus",
+  "vlVersion": "2.91",
+  "apps": [
+    {
+      "id": "AdminApp",
+      "filePath": "Apps/AdminApp.vx",
+      "pages": [
+        {
+          "id": "AdminApp",
+          "sections": []
+        }
+      ]
+    },
+    {
+      "id": "StudentApp",
+      "filePath": "Apps/StudentApp.vx",
+      "pages": [
+        {
+          "id": "StudentApp",
+          "sections": []
+        }
+      ]
+    },
+    {
+      "id": "TeacherApp",
+      "filePath": "Apps/TeacherApp.vx",
+      "pages": [
+        {
+          "id": "TeacherApp",
+          "sections": []
+        }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "AdminDashboardSection",
+      "filePath": "Sections/AdminDashboardSection.sc",
+      "consumesServices": [
+        "User",
+        "Book",
+        "Course",
+        "Notification"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "AttendanceSection",
+      "filePath": "Sections/AttendanceSection.sc",
+      "consumesServices": [
+        "Course",
+        "Attendance"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "BookDetailSection",
+      "filePath": "Sections/BookDetailSection.sc",
+      "consumesServices": [
+        "Book",
+        "Borrow",
+        "TOAST",
+        "SYSTEM"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "BookSearchSection",
+      "filePath": "Sections/BookSearchSection.sc",
+      "consumesServices": [
+        "Book"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "CourseAdminSection",
+      "filePath": "Sections/CourseAdminSection.sc",
+      "consumesServices": [
+        "Course"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "CourseDetailSection",
+      "filePath": "Sections/CourseDetailSection.sc",
+      "consumesServices": [
+        "Course"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "CourseListSection",
+      "filePath": "Sections/CourseListSection.sc",
+      "consumesServices": [
+        "Course"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "CourseScheduleSection",
+      "filePath": "Sections/CourseScheduleSection.sc",
+      "consumesServices": [
+        "Course"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "ExamScheduleSection",
+      "filePath": "Sections/ExamScheduleSection.sc",
+      "consumesServices": [
+        "Grade"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "GradeManageSection",
+      "filePath": "Sections/GradeManageSection.sc",
+      "consumesServices": [
+        "Course",
+        "Grade"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "GradeQuerySection",
+      "filePath": "Sections/GradeQuerySection.sc",
+      "consumesServices": [
+        "Grade"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "LibraryAdminSection",
+      "filePath": "Sections/LibraryAdminSection.sc",
+      "consumesServices": [
+        "Book",
+        "TOAST"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "LibraryHomeSection",
+      "filePath": "Sections/LibraryHomeSection.sc",
+      "consumesServices": [
+        "Book",
+        "Borrow",
+        "SYSTEM"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "LoginSection",
+      "filePath": "Sections/LoginSection.sc",
+      "consumesServices": [
+        "User"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "MyBorrowsSection",
+      "filePath": "Sections/MyBorrowsSection.sc",
+      "consumesServices": [
+        "Borrow",
+        "TOAST"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "NotificationSection",
+      "filePath": "Sections/NotificationSection.sc",
+      "consumesServices": [
+        "Notification"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "ProfileSection",
+      "filePath": "Sections/ProfileSection.sc",
+      "consumesServices": [
+        "User"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "StudentDashboardSection",
+      "filePath": "Sections/StudentDashboardSection.sc",
+      "consumesServices": [
+        "Course",
+        "Borrow",
+        "Grade",
+        "Notification"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "StudentManageSection",
+      "filePath": "Sections/StudentManageSection.sc",
+      "consumesServices": [
+        "User"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "TeacherCourseSection",
+      "filePath": "Sections/TeacherCourseSection.sc",
+      "consumesServices": [
+        "Course"
+      ],
+      "usesComponents": []
+    },
+    {
+      "id": "TeacherDashboardSection",
+      "filePath": "Sections/TeacherDashboardSection.sc",
+      "consumesServices": [
+        "Course",
+        "Notification"
+      ],
+      "usesComponents": []
+    }
+  ],
+  "components": [
+    {
+      "id": "BookCard",
+      "filePath": "ExtComponents/BookCard.cp",
+      "props": [
+        {
+          "name": "statusLabel",
+          "type": "STRING",
+          "default": "\"可借\""
+        },
+        {
+          "name": "statusColor",
+          "type": "STRING",
+          "default": "--colorBookAvailable"
+        }
+      ]
+    },
+    {
+      "id": "CourseCard",
+      "filePath": "ExtComponents/CourseCard.cp",
+      "props": []
+    },
+    {
+      "id": "NotificationItem",
+      "filePath": "ExtComponents/NotificationItem.cp",
+      "props": [
+        {
+          "name": "typeIcon",
+          "type": "STRING",
+          "default": "\"🔔\""
+        },
+        {
+          "name": "typeColor",
+          "type": "STRING",
+          "default": "--colorInfo"
+        },
+        {
+          "name": "rowBg",
+          "type": "STRING",
+          "default": "--colorBgPrimary"
+        },
+        {
+          "name": "swipeX",
+          "type": "FLOAT",
+          "default": "0"
+        }
+      ]
+    },
+    {
+      "id": "ScheduleGrid",
+      "filePath": "ExtComponents/ScheduleGrid.cp",
+      "props": [
+        {
+          "name": "dayLabels",
+          "type": "JSON",
+          "default": "[\"周一\",\"周二\",\"周三\",\"周四\",\"周五\",\"周六\",\"周日\"]"
+        },
+        {
+          "name": "periodLabels",
+          "type": "JSON",
+          "default": "[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\",\"10\",\"11\",\"12\"]"
+        },
+        {
+          "name": "highlightBg",
+          "type": "STRING",
+          "default": "--colorTeachingBg"
+        }
+      ]
+    },
+    {
+      "id": "StatCard",
+      "filePath": "ExtComponents/StatCard.cp",
+      "props": [
+        {
+          "name": "trendIcon",
+          "type": "STRING",
+          "default": "\"↑\""
+        },
+        {
+          "name": "trendColor",
+          "type": "STRING",
+          "default": "--colorSuccess"
+        },
+        {
+          "name": "bgTint",
+          "type": "STRING",
+          "default": "--colorBgSecondary"
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "domainId": "AttendanceDomain",
+      "filePath": "Services/AttendanceDomain.vs",
+      "methods": [],
+      "virtualTables": []
+    },
+    {
+      "domainId": "BookDomain",
+      "filePath": "Services/BookDomain.vs",
+      "methods": [],
+      "virtualTables": []
+    },
+    {
+      "domainId": "BorrowDomain",
+      "filePath": "Services/BorrowDomain.vs",
+      "methods": [],
+      "virtualTables": []
+    },
+    {
+      "domainId": "CourseDomain",
+      "filePath": "Services/CourseDomain.vs",
+      "methods": [],
+      "virtualTables": []
+    },
+    {
+      "domainId": "GradeDomain",
+      "filePath": "Services/GradeDomain.vs",
+      "methods": [],
+      "virtualTables": []
+    },
+    {
+      "domainId": "NotificationDomain",
+      "filePath": "Services/NotificationDomain.vs",
+      "methods": [],
+      "virtualTables": []
+    },
+    {
+      "domainId": "UserDomain",
+      "filePath": "Services/UserDomain.vs",
+      "methods": [],
+      "virtualTables": []
+    }
+  ],
+  "dataSchema": {
+    "tables": [],
+    "relations": []
+  }
+}

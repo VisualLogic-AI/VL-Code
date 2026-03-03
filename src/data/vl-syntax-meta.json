@@ -1,0 +1,28 @@
+{
+  "version": "2.10",
+  "vlVersion": "2.91",
+  "lastUpdated": "2026-03-02",
+  "totalLines": 3900,
+  "sections": [
+    { "id": "overview", "title": "VL Overview & File Types", "startLine": 2, "endLine": 355 },
+    { "id": "errors", "title": "Typical Error Examples", "startLine": 356, "endLine": 374 },
+    { "id": "syntax", "title": "Core Syntax Constraints", "startLine": 375, "endLine": 456 },
+    { "id": "naming", "title": "Naming Conventions", "startLine": 457, "endLine": 513 },
+    { "id": "components", "title": "Component Syntax", "startLine": 514, "endLine": 707 },
+    { "id": "variables", "title": "Variables & Types", "startLine": 708, "endLine": 996 },
+    { "id": "database-types", "title": "Database Table & Virtual Table Field Types", "startLine": 997, "endLine": 1070 },
+    { "id": "logic", "title": "Logic Definition (Methods, Functions, Events)", "startLine": 1071, "endLine": 1376 },
+    { "id": "expressions", "title": "Expressions", "startLine": 1377, "endLine": 1472 },
+    { "id": "logic-rules", "title": "Logic Writing Basic Rules", "startLine": 1473, "endLine": 1660 },
+    { "id": "styles", "title": "Style Definition & StateStyle", "startLine": 1661, "endLine": 2034 },
+    { "id": "database-rules", "title": "Database File Rules", "startLine": 2035, "endLine": 2088 },
+    { "id": "app-supplement", "title": "App (.vx) Writing Supplement", "startLine": 2089, "endLine": 2106 },
+    { "id": "section-supplement", "title": "Section/Component (.sc/.cp) Writing Supplement", "startLine": 2107, "endLine": 2228 },
+    { "id": "service-supplement", "title": "ServiceDomain (.vs) Definition Supplement", "startLine": 2229, "endLine": 2481 },
+    { "id": "auth", "title": "User Login and Permission Control", "startLine": 2482, "endLine": 2624 },
+    { "id": "hard-rules", "title": "VL Generation Hard Rules (MUST / MUST NOT)", "startLine": 2625, "endLine": 2669 },
+    { "id": "widgets-frontend", "title": "Frontend Components Catalog", "startLine": 2670, "endLine": 3549 },
+    { "id": "widgets-common", "title": "Frontend Component Common Properties/Methods/Events", "startLine": 3550, "endLine": 3606 },
+    { "id": "widgets-backend", "title": "Backend Components (ServiceDomain)", "startLine": 3607, "endLine": 3900 }
+  ]
+}

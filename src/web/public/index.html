@@ -1,0 +1,4093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VL-Code IDE</title>
+<!-- CodeMirror 5 (served locally from node_modules) -->
+<link rel="stylesheet" href="/lib/codemirror/lib/codemirror.css">
+<link rel="stylesheet" href="/lib/codemirror/addon/fold/foldgutter.css">
+<script src="/lib/codemirror/lib/codemirror.js"></script>
+<script src="/lib/codemirror/addon/edit/matchbrackets.js"></script>
+<script src="/lib/codemirror/addon/edit/closebrackets.js"></script>
+<script src="/lib/codemirror/addon/selection/active-line.js"></script>
+<script src="/lib/codemirror/addon/fold/foldcode.js"></script>
+<script src="/lib/codemirror/addon/fold/foldgutter.js"></script>
+<script src="/lib/codemirror/addon/fold/indent-fold.js"></script>
+<script src="/lib/codemirror/mode/javascript/javascript.js"></script>
+<script src="/lib/codemirror/mode/css/css.js"></script>
+<script src="/lib/codemirror/mode/xml/xml.js"></script>
+<script src="/lib/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+<style>
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #21262d; --border: #30363d;
+  --text: #e6edf3; --text2: #8b949e; --accent: #58a6ff; --green: #3fb950;
+  --yellow: #d29922; --red: #f85149; --purple: #a371f7;
+  --font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:13px; height:100vh; display:flex; flex-direction:column; }
+
+/* Header */
+header { background:var(--bg2); border-bottom:1px solid var(--border); padding:8px 16px; display:flex; align-items:center; gap:12px; margin-right:400px; }
+header h1 { font-size:15px; color:var(--accent); font-weight:600; white-space:nowrap; }
+header .info { color:var(--text2); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+header .spacer { flex:1; }
+header .ctx-bar { display:flex; align-items:center; gap:6px; }
+header .ctx-bar .bar { width:100px; height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+header .ctx-bar .bar-fill { height:100%; background:var(--green); border-radius:3px; transition:width 0.3s; }
+.hdr-btn { background:var(--bg3); color:var(--text2); border:1px solid var(--border); padding:5px 12px; border-radius:5px; cursor:pointer; font-family:var(--font); font-size:11px; white-space:nowrap; }
+.hdr-btn:hover { background:var(--border); color:var(--text); }
+.hdr-btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.hdr-btn-primary:hover { background:#79b8ff; }
+
+main { flex:1; display:flex; overflow:hidden; }
+
+/* File sidebar */
+.sidebar { width:220px; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+.sidebar h3 { padding:10px 12px; font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:1px; }
+.file-tree { flex:1; overflow-y:auto; padding:0 6px 6px; }
+.file-tree .category { margin-bottom:6px; }
+.file-tree .cat-name { color:var(--accent); font-size:10px; padding:3px 8px; cursor:pointer; }
+.file-tree .file { padding:2px 8px 2px 18px; cursor:pointer; color:var(--text2); border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+.file-tree .file:hover { background:var(--bg3); color:var(--text); }
+.file-tree .file.active { background:var(--accent); color:#fff; }
+/* Workflow selector dropdown */
+.wf-selector { position:relative; }
+.wf-dropdown { display:none; position:absolute; top:100%; right:0; margin-top:4px; background:var(--bg2); border:1px solid var(--border); border-radius:6px; min-width:240px; z-index:50; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+.wf-dropdown.open { display:block; }
+.wf-item { padding:6px 10px; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:space-between; }
+.wf-item:hover { background:var(--bg3); }
+.wf-item .wf-name { color:var(--text); }
+.wf-item .wf-steps { color:var(--text2); font-size:9px; }
+.wf-item .wf-view { color:var(--accent); font-size:9px; cursor:pointer; margin-left:6px; }
+.wf-item .wf-view:hover { text-decoration:underline; }
+
+/* Sidebar actions */
+.sidebar-actions { display:flex; gap:3px; padding:0 10px 6px; flex-wrap:wrap; }
+.sidebar-actions .sa-btn { display:inline-flex; align-items:center; gap:3px; background:var(--bg3); color:var(--text2); border:1px solid var(--border); padding:3px 7px; border-radius:4px; cursor:pointer; font-family:var(--font); font-size:9px; text-align:center; white-space:nowrap; }
+.sidebar-actions .sa-btn:hover { background:var(--border); color:var(--text); }
+.sidebar-actions .sa-btn.sa-danger:hover { background:var(--red); color:#fff; border-color:var(--red); }
+.sidebar-actions .sa-btn .sa-icon { font-size:10px; }
+
+/* File tree context menu */
+.ctx-menu { display:none; position:fixed; z-index:200; background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:4px 0; min-width:140px; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+.ctx-menu.open { display:block; }
+.ctx-menu-item { padding:5px 14px; font-size:11px; cursor:pointer; color:var(--text2); }
+.ctx-menu-item:hover { background:var(--bg3); color:var(--text); }
+.ctx-menu-item.danger { color:var(--red); }
+.ctx-menu-item.danger:hover { background:var(--red); color:#fff; }
+.ctx-menu-sep { height:1px; background:var(--border); margin:3px 0; }
+
+.type-badge { display:inline-block; font-size:8px; padding:1px 3px; border-radius:2px; margin-right:3px; font-weight:600; }
+.type-app { background:#1f6feb33; color:var(--accent); }
+.type-section { background:#3fb95033; color:var(--green); }
+.type-component { background:#d2992233; color:var(--yellow); }
+.type-service { background:#f8514933; color:var(--red); }
+.type-database { background:#8b949e33; color:var(--text2); }
+.type-theme { background:#a371f733; color:var(--purple); }
+.type-process { background:#a371f720; color:#c49bff; }
+.type-json { background:#d2992220; color:#e0ad40; }
+.type-doc { background:#8b949e20; color:#9da5ae; }
+
+/* Mode tabs (Code / Meta Map / Flow Editor) */
+.mode-tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); padding:0 8px; gap:2px; }
+.mode-tab { padding:6px 16px; cursor:pointer; color:var(--text2); font-size:11px; font-weight:600; border-bottom:2px solid transparent; border-radius:4px 4px 0 0; transition:all 0.15s; white-space:nowrap; }
+.mode-tab:hover { color:var(--text); background:var(--bg3); }
+.mode-tab.active { color:var(--accent); border-bottom-color:var(--accent); background:var(--bg); }
+
+/* Folder path link */
+.folder-path { padding:4px 12px; font-size:9px; color:var(--text2); cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:4px; border-bottom:1px solid var(--border); }
+.folder-path:hover { color:var(--accent); background:var(--bg3); }
+.folder-path .fp-icon { font-size:10px; flex-shrink:0; }
+
+/* Workflow binding labels */
+.wf-binding { display:flex; align-items:center; justify-content:space-between; padding:5px 10px; font-size:10px; border-bottom:1px solid var(--border); }
+.wf-binding .wf-b-label { color:var(--text2); }
+.wf-binding select { background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-family:var(--font); font-size:9px; outline:none; max-width:140px; }
+
+/* Auto-linked URLs */
+.msg.assistant .content-text a { color:var(--accent); text-decoration:underline; text-underline-offset:2px; }
+.msg.assistant .content-text a:hover { color:#79b8ff; }
+
+/* Preview URL list in sidebar */
+.project-config { border-top:1px solid var(--border); }
+.pc-header { font-size:9px; color:var(--text2); padding:6px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:0.5px; margin:0; }
+.pc-header:hover { color:var(--text); }
+.pc-file { padding:3px 12px 3px 18px; font-size:11px; cursor:pointer; color:var(--yellow); border-radius:4px; display:flex; align-items:center; justify-content:space-between; }
+.pc-file:hover { background:var(--bg3); color:var(--text); }
+.pc-sync-btn { background:none; border:1px solid var(--border); color:var(--text2); border-radius:3px; cursor:pointer; font-size:11px; padding:0 4px; line-height:1.4; }
+.pc-sync-btn:hover { color:var(--accent); border-color:var(--accent); }
+.pc-doc-toggle { font-size:9px; opacity:0.5; cursor:pointer; padding:1px 4px; border-radius:3px; background:none; border:none; color:var(--text2); }
+.pc-doc-toggle:hover { opacity:1; }
+.pc-doc-toggle.active { color:var(--green); opacity:1; }
+.preview-urls { padding:4px 12px 8px; }
+.preview-urls h4 { font-size:9px; color:var(--text2); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
+.preview-url-item { display:flex; align-items:center; gap:6px; padding:3px 6px; border-radius:3px; cursor:pointer; font-size:10px; color:var(--green); margin-bottom:2px; }
+.preview-url-item:hover { background:var(--bg3); }
+.preview-url-item .pui-name { font-weight:600; min-width:40px; }
+.preview-url-item .pui-url { color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+
+/* Preview mode tab */
+.mode-tab[data-mode="preview"] { color:var(--green); }
+.mode-tab[data-mode="preview"].active { color:var(--green); border-bottom-color:var(--green); }
+.preview-bar { display:flex; align-items:center; gap:8px; padding:4px 12px; background:var(--bg2); border-bottom:1px solid var(--border); font-size:10px; }
+.preview-bar .preview-url { flex:1; color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.preview-bar .preview-btn { background:var(--bg3); color:var(--text2); border:1px solid var(--border); padding:2px 8px; border-radius:3px; cursor:pointer; font-family:var(--font); font-size:9px; }
+.preview-bar .preview-btn:hover { background:var(--border); color:var(--text); }
+.preview-bar select { background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 4px; font-family:var(--font); font-size:9px; outline:none; }
+
+/* Flow toolbar */
+.flow-toolbar { display:flex; align-items:center; justify-content:space-between; padding:4px 10px; background:var(--bg2); border-bottom:1px solid var(--border); gap:8px; }
+.flow-sub-tabs { display:flex; gap:2px; }
+.flow-sub-tab { padding:3px 12px; cursor:pointer; color:var(--text2); font-size:10px; font-weight:600; border-radius:4px; transition:all 0.15s; }
+.flow-sub-tab:hover { color:var(--text); background:var(--bg3); }
+.flow-sub-tab.active { color:var(--accent); background:var(--bg3); }
+.flow-actions { display:flex; align-items:center; gap:6px; }
+.flow-actions select { background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:3px; padding:2px 6px; font-family:var(--font); font-size:9px; outline:none; max-width:180px; }
+.flow-btn { background:var(--bg3); color:var(--text2); border:1px solid var(--border); padding:2px 8px; border-radius:3px; cursor:pointer; font-family:var(--font); font-size:9px; }
+.flow-btn:hover { background:var(--border); color:var(--text); }
+.flow-btn-run { background:var(--green); color:#000; border-color:var(--green); font-weight:700; }
+.flow-btn-run:hover { background:#2ea043; }
+.flow-btn-run:disabled { opacity:0.4; cursor:not-allowed; }
+.flow-btn-run.running { background:var(--orange); border-color:var(--orange); animation:pulse 1.5s ease-in-out infinite; }
+.flow-run-status { font-size:9px; color:var(--text2); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Editor + Chat */
+.content { flex:1; display:flex; flex-direction:column; }
+.panels { flex:1; display:flex; overflow:hidden; margin-right:400px; }
+
+/* Editor */
+.editor-panel { flex:1; display:flex; flex-direction:column; border-right:1px solid var(--border); }
+.editor-tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); overflow-x:auto; min-height:32px; }
+.editor-tabs .tab { padding:6px 14px; cursor:pointer; color:var(--text2); border-bottom:2px solid transparent; white-space:nowrap; font-size:11px; display:flex; align-items:center; gap:6px; }
+.editor-tabs .tab.active { color:var(--text); border-bottom-color:var(--accent); background:var(--bg); }
+.editor-tabs .tab .tab-icon { font-size:10px; opacity:0.7; }
+.editor-tabs .tab .tab-close { font-size:9px; opacity:0; padding:1px 3px; border-radius:3px; line-height:1; }
+.editor-tabs .tab:hover .tab-close { opacity:0.5; }
+.editor-tabs .tab .tab-close:hover { opacity:1; background:var(--bg3); }
+.editor-area { flex:1; position:relative; overflow:hidden; }
+.editor-area textarea { width:100%; height:100%; background:var(--bg); color:var(--text); border:none; padding:12px; font-family:var(--font); font-size:13px; line-height:1.6; resize:none; outline:none; tab-size:2; display:none; }
+.editor-area .CodeMirror { width:100%; height:100%; font-family:'SF Mono','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.6; background:var(--bg); }
+.editor-area .CodeMirror-gutters { background:var(--bg2); border-right:1px solid var(--border); }
+.editor-area .CodeMirror-linenumber { color:var(--text2); opacity:0.5; padding:0 8px 0 4px; }
+.editor-area .CodeMirror-cursor { border-left:2px solid var(--accent); }
+.editor-area .CodeMirror-selected { background:rgba(88,166,255,0.15); }
+.editor-area .CodeMirror-activeline-background { background:rgba(255,255,255,0.03); }
+.editor-area .CodeMirror-matchingbracket { color:var(--green) !important; text-decoration:underline; }
+.editor-area .CodeMirror-foldgutter { width:14px; }
+.editor-area .CodeMirror-foldgutter-open, .editor-area .CodeMirror-foldgutter-folded { color:var(--text2); }
+/* Dark theme token colors — VL optimized, no black text */
+.editor-area .cm-keyword { color:#ff7b72; font-weight:600; }
+.editor-area .cm-variable-2 { color:#ffa657; }
+.editor-area .cm-def { color:#d2a8ff; }
+.editor-area .cm-string { color:#a5d6ff; }
+.editor-area .cm-number { color:#79c0ff; }
+.editor-area .cm-atom { color:#79c0ff; }
+.editor-area .cm-type { color:#79c0ff; font-weight:600; }
+.editor-area .cm-builtin { color:#7ee787; }
+.editor-area .cm-tag { color:#7ee787; font-weight:600; }
+.editor-area .cm-attribute { color:#79c0ff; }
+.editor-area .cm-property { color:#c9d1d9; }
+.editor-area .cm-comment { color:#8b949e; font-style:italic; }
+.editor-area .cm-meta { color:#8b949e; }
+.editor-area .cm-qualifier { color:#6e7681; }
+.editor-area .cm-indent-marker { color:#6e7681; }
+.editor-area .cm-section-header { color:#d2a8ff; font-weight:700; font-size:14px; }
+.editor-area .cm-operator { color:#e6edf3; }
+.editor-area .cm-variable { color:#c9d1d9; }
+.editor-area .cm-variable-3 { color:#ffa657; }
+.editor-area .cm-bracket { color:#e6edf3; }
+.editor-area .cm-punctuation { color:#8b949e; }
+.editor-area .cm-link { color:#58a6ff; }
+.editor-area .CodeMirror-line { color:var(--text); }
+.editor-area .CodeMirror pre.CodeMirror-line { color:#e6edf3; }  /* JSON punctuation: unstyled spans inherit this */
+.editor-area .CodeMirror-scroll { scrollbar-color:var(--bg3) transparent; }
+.editor-area .iframe-container { display:none; width:100%; height:100%; }
+.editor-area .iframe-container iframe { width:100%; height:100%; border:none; background:#fff; }
+.editor-placeholder { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--text2); text-align:center; line-height:2; }
+
+/* Code preview (read-only syntax view) */
+.code-preview { width:100%; height:100%; background:var(--bg); overflow:auto; display:none; }
+.code-preview pre { padding:12px; font-family:var(--font); font-size:13px; line-height:1.6; tab-size:2; margin:0; counter-reset:line; }
+.code-preview .line { display:block; white-space:pre-wrap; word-break:break-all; }
+.code-preview .line::before { counter-increment:line; content:counter(line); display:inline-block; width:3.5em; margin-right:1em; text-align:right; color:var(--text2); opacity:0.4; font-size:11px; user-select:none; }
+/* VL Syntax colors */
+.code-preview .kw { color:#ff7b72; } /* keywords: SERVICE, PUBLIC_SERVICE, SECTION, EVENT, etc */
+.code-preview .str { color:#a5d6ff; } /* strings */
+.code-preview .cmt { color:#8b949e; font-style:italic; } /* comments */
+.code-preview .var { color:#ffa657; } /* $variables */
+.code-preview .evt { color:#d2a8ff; } /* @events */
+.code-preview .type { color:#79c0ff; } /* type names */
+.code-preview .num { color:#79c0ff; } /* numbers */
+.code-preview .tag { color:#7ee787; } /* <Component-X>, <Section-Y> */
+.code-preview .prop { color:#d2a8ff; } /* property keys in JSON */
+/* Markdown preview */
+.md-preview { width:100%; height:100%; background:var(--bg); overflow:auto; display:none; padding:16px 24px; color:var(--text); line-height:1.7; }
+.md-preview h1 { font-size:20px; border-bottom:1px solid var(--border); padding-bottom:8px; margin:16px 0 12px; }
+.md-preview h2 { font-size:17px; border-bottom:1px solid var(--border); padding-bottom:6px; margin:14px 0 10px; }
+.md-preview h3 { font-size:14px; margin:12px 0 8px; }
+.md-preview p { margin:8px 0; }
+.md-preview ul, .md-preview ol { margin:8px 0; padding-left:24px; }
+.md-preview code { background:var(--bg3); padding:2px 5px; border-radius:3px; font-size:12px; }
+.md-preview pre { background:var(--bg3); padding:12px; border-radius:6px; overflow-x:auto; margin:8px 0; }
+.md-preview pre code { background:none; padding:0; }
+.md-preview blockquote { border-left:3px solid var(--accent); padding-left:12px; color:var(--text2); }
+
+/* Chat panel — fixed floating on right side, always visible */
+.chat-panel { position:fixed; right:0; top:0; bottom:0; width:400px; z-index:100; display:flex; flex-direction:column; background:var(--bg); border-left:1px solid var(--border); box-shadow:-4px 0 16px rgba(0,0,0,0.3); }
+.chat-resize-handle { position:absolute; left:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:101; }
+.chat-resize-handle:hover, .chat-resize-handle.dragging { background:var(--accent); opacity:0.3; }
+.chat-panel.collapsed { width:36px !important; min-width:36px; }
+.chat-panel.collapsed .chat-messages, .chat-panel.collapsed .chat-input-area, .chat-panel.collapsed .conv-tabs, .chat-panel.collapsed .chat-search, .chat-panel.collapsed .chat-resize-handle, .chat-panel.collapsed .chat-actions { display:none !important; }
+.chat-panel.collapsed .chat-header { writing-mode:vertical-rl; text-orientation:mixed; padding:12px 6px; cursor:pointer; justify-content:center; border-bottom:none; }
+.chat-panel.collapsed .chat-header>*:not(.chat-collapse-btn) { display:none; }
+.chat-panel.collapsed .chat-collapse-btn { writing-mode:horizontal-tb; }
+.chat-collapse-btn { background:none; border:none; color:var(--text2); cursor:pointer; font-size:12px; padding:2px 4px; border-radius:3px; }
+.chat-collapse-btn:hover { color:var(--text); background:var(--bg3); }
+.chat-actions { display:flex; gap:3px; padding:4px 8px; background:var(--bg2); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.chat-actions .ca-btn { background:var(--bg3); color:var(--text2); border:1px solid var(--border); padding:2px 7px; border-radius:4px; cursor:pointer; font-family:var(--font); font-size:9px; }
+.chat-actions .ca-btn:hover { background:var(--border); color:var(--text); }
+.chat-header { padding:8px 14px; background:var(--bg2); border-bottom:1px solid var(--border); font-size:11px; color:var(--text2); display:flex; justify-content:space-between; align-items:center; }
+.chat-messages { flex:1; overflow-y:auto; padding:10px; }
+.msg { margin-bottom:8px; padding:6px 10px; border-radius:6px; line-height:1.5; white-space:pre-wrap; word-break:break-word; font-size:12px; }
+.msg.user { background:var(--bg3); border:1px solid var(--border); }
+.msg.assistant { background:#161b22; border:1px solid #30363d; }
+.msg .label { font-size:9px; color:var(--text2); margin-bottom:3px; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* Claude Code-style compact tool indicators */
+.tool-group { margin:4px 0; background:var(--bg2); border-radius:6px; border:1px solid var(--border); overflow:hidden; }
+.tool-header { display:flex; align-items:center; gap:6px; padding:6px 10px; cursor:pointer; font-size:11px; color:var(--text2); }
+.tool-header:hover { background:var(--bg3); }
+.tool-header .tool-icon { width:16px; text-align:center; font-size:12px; flex-shrink:0; }
+.tool-header .tool-name { color:var(--accent); font-weight:600; min-width:50px; }
+.tool-header .tool-desc { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+.tool-header .tool-time { font-size:9px; color:var(--text2); opacity:0.6; min-width:28px; text-align:right; flex-shrink:0; }
+.tool-header .tool-toggle { font-size:8px; color:var(--text2); transition:transform 0.2s; flex-shrink:0; }
+.tool-header .tool-toggle.open { transform:rotate(90deg); }
+.tool-body { display:none; padding:6px 10px 8px; font-size:10px; color:var(--text2); border-top:1px solid var(--border); max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+.tool-body.open { display:block; }
+.tool-detail { font-size:10px; color:var(--text2); padding:2px 0; display:flex; gap:6px; }
+.tool-detail .td-label { color:var(--text2); opacity:0.7; min-width:50px; }
+.tool-detail .td-val { color:var(--text); flex:1; }
+.tool-diff { margin:3px 0; font-family:var(--font); font-size:11px; }
+.tool-diff .td-old { color:var(--red); opacity:0.8; padding:1px 4px; background:rgba(248,81,73,0.08); border-radius:2px; }
+.tool-diff .td-new { color:var(--green); padding:1px 4px; background:rgba(63,185,80,0.08); border-radius:2px; }
+.tool-result-badge { display:inline-block; font-size:9px; padding:1px 6px; border-radius:8px; margin-left:6px; }
+.tool-result-badge.ok { background:rgba(63,185,80,0.15); color:var(--green); }
+.tool-result-badge.err { background:rgba(248,81,73,0.15); color:var(--red); }
+.tool-status-icon { font-size:12px; flex-shrink:0; }
+.tool-status-icon.running { color:var(--accent); }
+.tool-status-icon.done { color:var(--green); }
+.tool-status-icon.error { color:var(--red); }
+
+/* Spinner for active tool */
+@keyframes spin { to { transform:rotate(360deg); } }
+.tool-spinner { width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; flex-shrink:0; }
+
+/* Todo list (compact) */
+.msg.todo-list { background:var(--bg2); font-size:11px; padding:6px 10px; border-radius:6px; border:1px solid var(--border); }
+.todo-item { display:flex; align-items:center; gap:5px; padding:2px 0; }
+.todo-icon { width:12px; text-align:center; font-size:10px; }
+.todo-done { color:var(--green); }
+.todo-active { color:var(--yellow); }
+.todo-pending { color:var(--text2); }
+
+/* Thinking indicator */
+.thinking-block { margin:4px 0; padding:6px 10px; background:linear-gradient(135deg, #1a1e2e, #161b22); border-radius:6px; border:1px solid #30365d; font-size:11px; }
+.thinking-header { display:flex; align-items:center; gap:6px; color:var(--purple); cursor:pointer; }
+.thinking-header .think-icon { animation:pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
+.thinking-body { display:none; margin-top:4px; color:var(--text2); font-size:10px; max-height:100px; overflow-y:auto; white-space:pre-wrap; word-break:break-word; }
+.thinking-body.open { display:block; }
+.thinking-block.done .think-icon { animation:none; opacity:0.5; }
+.thinking-block.done .thinking-header { color:var(--text2); }
+
+/* Markdown in assistant messages */
+.msg.assistant .content-text { white-space:normal; }
+.msg.assistant .content-text p { margin:4px 0; }
+.msg.assistant .content-text code { background:var(--bg3); padding:1px 4px; border-radius:3px; font-size:11px; }
+.msg.assistant .content-text pre { background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:8px; margin:6px 0; overflow-x:auto; }
+.msg.assistant .content-text pre code { background:none; padding:0; }
+.msg.assistant .content-text h1,.msg.assistant .content-text h2,.msg.assistant .content-text h3 { margin:8px 0 4px; font-size:13px; color:var(--accent); }
+.msg.assistant .content-text ul,.msg.assistant .content-text ol { padding-left:18px; margin:4px 0; }
+.msg.assistant .content-text li { margin:2px 0; }
+.msg.assistant .content-text strong { color:var(--text); }
+.msg.assistant .content-text a { color:var(--accent); text-decoration:none; }
+.msg.assistant .content-text blockquote { border-left:2px solid var(--border); padding-left:8px; color:var(--text2); margin:4px 0; }
+
+/* Retry indicator */
+.retry-msg { margin:4px 0; padding:4px 10px; font-size:10px; color:var(--yellow); display:flex; align-items:center; gap:5px; }
+
+/* Token details in context bar */
+.ctx-tooltip { position:relative; cursor:help; }
+.ctx-detail { display:none; position:absolute; bottom:20px; right:0; background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:8px 12px; font-size:10px; white-space:nowrap; z-index:50; min-width:180px; }
+.ctx-tooltip:hover .ctx-detail { display:block; }
+
+.chat-input { display:flex; border-top:1px solid var(--border); background:var(--bg2); }
+.chat-input input { flex:1; background:transparent; border:none; color:var(--text); padding:10px 14px; font-family:var(--font); font-size:12px; outline:none; }
+.chat-input button { background:var(--accent); color:#fff; border:none; padding:6px 14px; cursor:pointer; font-family:var(--font); font-size:11px; font-weight:600; }
+.chat-input button:disabled { opacity:0.4; cursor:default; }
+
+/* Bottom bar */
+.bottom-bar { background:var(--bg2); border-top:1px solid var(--border); padding:3px 16px; display:flex; gap:16px; font-size:10px; color:var(--text2); align-items:center; }
+.bottom-bar .status { display:flex; align-items:center; gap:5px; }
+.bottom-bar .dot { width:6px; height:6px; border-radius:50%; }
+.dot-green { background:var(--green); }
+.dot-yellow { background:var(--yellow); }
+.dot-red { background:var(--red); }
+
+/* Modals */
+.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100; justify-content:center; align-items:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:var(--bg2); border:1px solid var(--border); border-radius:10px; width:560px; max-height:80vh; overflow-y:auto; padding:20px; }
+.modal-box h2 { margin-bottom:14px; font-size:16px; }
+.modal-box label { display:block; font-size:11px; color:var(--text2); margin-bottom:4px; margin-top:12px; }
+.modal-box input[type=text], .modal-box input[type=password], .modal-box select, .modal-box textarea {
+  width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px;
+  padding:8px 10px; font-family:var(--font); font-size:12px; outline:none; }
+.modal-box input:focus, .modal-box select:focus, .modal-box textarea:focus { border-color:var(--accent); }
+.modal-box textarea { height:100px; resize:vertical; }
+.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+.modal-actions .hdr-btn { padding:6px 18px; }
+
+/* Settings-specific */
+.key-row { display:flex; gap:6px; align-items:center; }
+.key-row input { flex:1; }
+.key-row button { flex-shrink:0; }
+.key-status { font-size:10px; margin-top:3px; }
+.key-ok { color:var(--green); }
+.key-missing { color:var(--red); }
+.model-option { padding:2px 0; }
+.model-desc { font-size:10px; color:var(--text2); }
+
+/* Setup overlay (shown when no API key) */
+.setup-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:300; justify-content:center; align-items:center; }
+.setup-overlay.active { display:flex; }
+.setup-box { width:480px; text-align:center; }
+.setup-box h1 { color:var(--accent); font-size:28px; margin-bottom:8px; }
+.setup-box p { color:var(--text2); font-size:13px; margin-bottom:24px; line-height:1.6; }
+.setup-box input { width:100%; margin-bottom:12px; }
+.setup-box .hdr-btn { width:100%; padding:10px; font-size:13px; }
+
+/* Gen progress */
+.gen-progress { margin-top:14px; }
+.gen-step { padding:4px 0; display:flex; align-items:center; gap:6px; font-size:11px; }
+
+/* Drag-and-drop overlay */
+.drop-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(88,166,255,0.12); border:3px dashed var(--accent); z-index:200; justify-content:center; align-items:center; pointer-events:none; }
+.drop-overlay.active { display:flex; }
+.drop-overlay .drop-msg { background:var(--bg2); border:1px solid var(--accent); border-radius:12px; padding:24px 36px; text-align:center; }
+.drop-overlay .drop-msg h2 { color:var(--accent); font-size:18px; margin-bottom:6px; }
+.drop-overlay .drop-msg p { color:var(--text2); font-size:12px; }
+
+/* Workspace tabs — header bar style */
+.ws-tabs { display:flex; gap:2px; overflow-x:auto; max-width:50%; scrollbar-width:none; flex-shrink:1; min-width:0; align-items:flex-end; }
+.ws-tabs::-webkit-scrollbar { display:none; }
+.ws-tab { display:flex; align-items:center; gap:4px; padding:4px 10px; background:var(--bg3); border:1px solid var(--border); border-bottom:none; border-radius:6px 6px 0 0; cursor:pointer; font-size:11px; color:var(--text2); white-space:nowrap; max-width:180px; min-width:40px; flex-shrink:0; transition:all 0.15s; }
+.ws-tab:hover { background:var(--border); color:var(--text); }
+.ws-tab.active { background:var(--bg); color:var(--accent); font-weight:600; }
+.ws-tab .ws-tab-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.ws-tab .ws-tab-close { font-size:9px; opacity:0; padding:1px 3px; border-radius:3px; cursor:pointer; line-height:1; }
+.ws-tab:hover .ws-tab-close { opacity:0.5; }
+.ws-tab .ws-tab-close:hover { opacity:1; background:var(--red); color:#fff; }
+.ws-tab-add { background:transparent; border:1px dashed var(--border); color:var(--text2); padding:3px 8px; border-radius:6px; cursor:pointer; font-size:14px; flex-shrink:0; line-height:1; font-family:var(--font); }
+.ws-tab-add:hover { background:var(--bg3); color:var(--text); }
+/* Workspace popover (reuses old dropdown items) */
+.ws-popover { display:none; position:absolute; top:100%; left:0; background:var(--bg2); border:1px solid var(--border); border-radius:6px; max-height:420px; overflow-y:auto; z-index:90; width:320px; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+.ws-popover.open { display:block; }
+.ws-popover .ws-section { font-size:9px; color:var(--text2); padding:6px 12px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); }
+.ws-item { padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:6px; }
+.ws-item:hover { background:var(--bg3); }
+.ws-item.active { background:rgba(88,166,255,0.08); border-left:2px solid var(--accent); }
+.ws-item .ws-item-name { font-size:11px; color:var(--text); font-weight:600; }
+.ws-item .ws-item-path { font-size:9px; color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:200px; }
+.ws-item .ws-del { color:var(--red); cursor:pointer; font-size:12px; opacity:0.5; padding:2px 4px; }
+.ws-item .ws-del:hover { opacity:1; }
+.ws-add { padding:8px 12px; display:flex; gap:6px; align-items:center; }
+.ws-add input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:4px 8px; font-family:var(--font); font-size:10px; outline:none; }
+.ws-add input:focus { border-color:var(--accent); }
+.ws-add button { font-size:10px; }
+/* Directory browser in workspace dropdown */
+.ws-browse { border-top:1px solid var(--border); }
+.ws-browse-header { display:flex; align-items:center; gap:4px; padding:6px 8px; background:var(--bg); border-bottom:1px solid var(--border); }
+.ws-browse-header .browse-up { background:none; border:1px solid var(--border); color:var(--text2); border-radius:3px; cursor:pointer; font-size:11px; padding:2px 6px; font-family:var(--font); }
+.ws-browse-header .browse-up:hover { color:var(--text); border-color:var(--text2); }
+.ws-browse-header .browse-path { flex:1; font-size:9px; color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:rtl; text-align:left; }
+.ws-browse-header .browse-select { background:var(--accent); color:#fff; border:none; border-radius:3px; cursor:pointer; font-size:9px; padding:2px 8px; font-family:var(--font); font-weight:600; }
+.ws-browse-header .browse-select:hover { opacity:0.85; }
+.ws-browse-list { max-height:180px; overflow-y:auto; }
+.ws-browse-item { display:flex; align-items:center; gap:6px; padding:4px 10px; cursor:pointer; font-size:11px; border-bottom:1px solid rgba(48,54,61,0.5); }
+.ws-browse-item:hover { background:var(--bg3); }
+.ws-browse-item.is-vl { background:rgba(88,166,255,0.05); }
+.ws-browse-item .dir-icon { font-size:12px; flex-shrink:0; }
+.ws-browse-item .dir-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ws-browse-item .dir-vl { font-size:8px; color:var(--accent); background:rgba(88,166,255,0.12); padding:1px 4px; border-radius:2px; flex-shrink:0; }
+
+/* Chat input area (enhanced with image + mention) */
+.chat-input-area { border-top:1px solid var(--border); background:var(--bg2); }
+.chat-attachments { display:flex; gap:4px; padding:4px 10px; flex-wrap:wrap; }
+.chat-attachments:empty { display:none; }
+.chat-attach-item { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-size:10px; display:flex; align-items:center; gap:4px; }
+.chat-attach-item img { width:24px; height:24px; object-fit:cover; border-radius:2px; }
+.chat-attach-item .remove { cursor:pointer; color:var(--red); font-size:10px; }
+.chat-input-row { display:flex; align-items:center; }
+.chat-input-row input { flex:1; background:transparent; border:none; color:var(--text); padding:10px 14px; font-family:var(--font); font-size:12px; outline:none; }
+.chat-input-row .input-btn { background:none; border:none; color:var(--text2); cursor:pointer; padding:6px 8px; font-size:14px; }
+.chat-input-row .input-btn:hover { color:var(--text); }
+.chat-input-row button.send-btn { background:var(--accent); color:#fff; border:none; padding:6px 14px; cursor:pointer; font-family:var(--font); font-size:11px; font-weight:600; }
+.chat-input-row button.send-btn:disabled { opacity:0.4; cursor:default; }
+
+/* @-mention autocomplete dropdown */
+.mention-dropdown { display:none; position:absolute; bottom:100%; left:0; right:0; background:var(--bg2); border:1px solid var(--border); border-radius:6px 6px 0 0; max-height:200px; overflow-y:auto; z-index:60; }
+.mention-dropdown.open { display:block; }
+.mention-item { padding:5px 12px; cursor:pointer; font-size:11px; display:flex; align-items:center; gap:6px; }
+.mention-item:hover,.mention-item.selected { background:var(--bg3); }
+.mention-item .m-type { font-size:8px; padding:1px 3px; border-radius:2px; font-weight:600; }
+
+/* Apply button for code blocks */
+.code-apply { position:absolute; top:4px; right:4px; background:var(--accent); color:#fff; border:none; border-radius:3px; padding:2px 8px; font-size:9px; cursor:pointer; font-family:var(--font); opacity:0.8; }
+.code-apply:hover { opacity:1; }
+.msg.assistant .content-text pre { position:relative; }
+
+/* Inline Diff */
+.diff-block { margin:6px 0; border:1px solid var(--border); border-radius:6px; overflow:hidden; font-size:11px; }
+.diff-header { display:flex; justify-content:space-between; align-items:center; padding:4px 10px; background:var(--bg3); border-bottom:1px solid var(--border); }
+.diff-header .diff-file { color:var(--accent); font-weight:600; }
+.diff-actions { display:flex; gap:4px; }
+.diff-actions button { padding:2px 8px; border-radius:3px; font-size:9px; cursor:pointer; font-family:var(--font); border:none; }
+.diff-accept { background:var(--green); color:#fff; }
+.diff-reject { background:var(--red); color:#fff; }
+.diff-body { max-height:200px; overflow-y:auto; }
+.diff-line { padding:0 8px; font-family:var(--font); white-space:pre; }
+.diff-add { background:#3fb95018; color:var(--green); }
+.diff-add::before { content:'+'; margin-right:6px; }
+.diff-del { background:#f8514918; color:var(--red); text-decoration:line-through; }
+.diff-del::before { content:'-'; margin-right:6px; }
+.diff-ctx { color:var(--text2); }
+
+/* Conversation tabs */
+.conv-tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--border); overflow-x:auto; min-height:28px; }
+.conv-tab { padding:5px 12px; cursor:pointer; color:var(--text2); font-size:10px; border-bottom:2px solid transparent; white-space:nowrap; display:flex; align-items:center; gap:4px; }
+.conv-tab.active { color:var(--text); border-bottom-color:var(--accent); }
+.conv-tab .conv-close { font-size:8px; opacity:0.5; cursor:pointer; margin-left:4px; }
+.conv-tab .conv-close:hover { opacity:1; color:var(--red); }
+.conv-new { padding:5px 8px; cursor:pointer; color:var(--text2); font-size:12px; border:none; background:none; }
+.conv-new:hover { color:var(--accent); }
+
+/* Image in user message */
+.msg-images { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+.msg-images img { max-width:120px; max-height:80px; border-radius:4px; border:1px solid var(--border); cursor:pointer; }
+
+/* AskUserQuestion widget */
+.ask-user-widget { margin:6px 0; background:var(--bg2); border:1px solid var(--accent); border-radius:8px; padding:10px 14px; }
+.ask-user-widget .ask-question { color:var(--text); font-size:12px; font-weight:600; margin-bottom:8px; }
+.ask-user-option { display:flex; align-items:flex-start; gap:8px; padding:6px 10px; margin:3px 0; border-radius:6px; cursor:pointer; border:1px solid var(--border); transition:all 0.15s; }
+.ask-user-option:hover { border-color:var(--accent); background:rgba(88,166,255,0.08); }
+.ask-user-option.selected { border-color:var(--accent); background:rgba(88,166,255,0.15); }
+.ask-user-option input[type=radio],.ask-user-option input[type=checkbox] { margin-top:3px; accent-color:var(--accent); }
+.ask-user-option .opt-label { font-size:11px; color:var(--text); font-weight:600; }
+.ask-user-option .opt-desc { font-size:10px; color:var(--text2); margin-top:1px; }
+.ask-user-other { margin-top:6px; display:flex; gap:6px; }
+.ask-user-other input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:5px 8px; font-family:var(--font); font-size:11px; outline:none; }
+.ask-user-submit { margin-top:8px; display:flex; justify-content:flex-end; }
+.ask-user-submit button { background:var(--accent); color:#fff; border:none; border-radius:4px; padding:5px 14px; font-family:var(--font); font-size:11px; cursor:pointer; }
+
+/* Skill command palette */
+.skill-palette { display:none; position:absolute; bottom:100%; left:0; right:0; background:var(--bg2); border:1px solid var(--border); border-radius:6px 6px 0 0; max-height:220px; overflow-y:auto; z-index:65; }
+.skill-palette.open { display:block; }
+.skill-item { padding:6px 12px; cursor:pointer; font-size:11px; display:flex; align-items:center; gap:8px; }
+.skill-item:hover,.skill-item.selected { background:var(--bg3); }
+.skill-item .sk-name { color:var(--accent); font-weight:600; }
+.skill-item .sk-desc { color:var(--text2); font-size:10px; }
+
+/* Search bar in chat */
+.chat-search { display:none; padding:4px 10px; background:var(--bg3); border-bottom:1px solid var(--border); }
+.chat-search.open { display:flex; gap:6px; align-items:center; }
+.chat-search input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:4px 8px; font-family:var(--font); font-size:10px; outline:none; }
+.chat-search .search-count { font-size:10px; color:var(--text2); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--bg3); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- Setup overlay (shown when no API key) -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-box">
+    <h1>VL-Code</h1>
+    <p>AI Programming IDE for VL Language<br>Powered by Claude Opus 4.6</p>
+    <label style="text-align:left;margin-bottom:4px;display:block;font-size:11px;color:var(--text2)">Anthropic API Key</label>
+    <input type="password" id="setupKey" placeholder="sk-ant-api03-..." style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--font);font-size:13px;outline:none;">
+    <button class="hdr-btn hdr-btn-primary" onclick="submitSetupKey()" style="width:100%;padding:10px;font-size:13px;">Start VL-Code</button>
+    <p style="font-size:10px;margin-top:12px;color:var(--text2)">Key is saved locally in .env file and never shared.</p>
+  </div>
+</div>
+
+<header>
+  <h1>VL-Code <span id="appVersion" style="font-size:11px;font-weight:400;color:var(--text2);vertical-align:middle;"></span></h1>
+  <div class="ws-tabs" id="wsTabs"></div>
+  <div style="position:relative;">
+    <button class="ws-tab-add" onclick="toggleWsPopover()" title="Open workspace">+</button>
+    <div class="ws-popover" id="wsPopover">
+      <div class="ws-section">Recent Workspaces</div>
+      <div id="wsList"></div>
+      <div class="ws-browse">
+        <div class="ws-browse-header">
+          <button class="browse-up" onclick="event.stopPropagation();browseDirUp()" title="Go to parent directory">&#9650;</button>
+          <span class="browse-path" id="browsePath">~</span>
+          <button class="browse-select" onclick="event.stopPropagation();selectBrowseDir()" title="Open this directory as workspace">Select</button>
+        </div>
+        <div class="ws-browse-list" id="browseList"></div>
+      </div>
+      <div class="ws-add">
+        <input type="text" id="wsAddPath" placeholder="Or type path..." onkeydown="if(event.key==='Enter')addWorkspace()">
+        <button class="hdr-btn" onclick="addWorkspace()" style="font-size:10px;padding:3px 8px;">Go</button>
+      </div>
+    </div>
+  </div>
+  <span class="info" id="projectInfo" style="max-width:120px;">Loading...</span>
+  <div class="spacer"></div>
+  <div class="ctx-bar ctx-tooltip">
+    <span class="info" id="ctxLabel">0%</span>
+    <div class="bar"><div class="bar-fill" id="ctxBar" style="width:0%"></div></div>
+    <div class="ctx-detail" id="ctxDetail">Context: 0 / 200K tokens</div>
+  </div>
+  <div class="wf-selector" style="position:relative;">
+    <button class="hdr-btn hdr-btn-primary" onclick="toggleWorkflowPanel()">Workflows</button>
+    <div class="wf-dropdown" id="wfDropdown">
+      <div style="font-size:10px;color:var(--text2);padding:8px 10px;border-bottom:1px solid var(--border);">Available Workflows</div>
+      <div id="wfList" style="max-height:160px;overflow-y:auto;"></div>
+      <div class="wf-binding">
+        <span class="wf-b-label">Generate:</span>
+        <select id="wfBindGenerate" onchange="saveWorkflowBindings()"></select>
+      </div>
+      <div class="wf-binding">
+        <span class="wf-b-label">Adjust:</span>
+        <select id="wfBindAdjust" onchange="saveWorkflowBindings()"></select>
+      </div>
+    </div>
+  </div>
+  <button class="hdr-btn" onclick="focusGenerate()">Generate</button>
+  <button class="hdr-btn" id="compileBtn" onclick="compileProject()" title="Compile & Preview">&#9654; Compile</button>
+  <button class="hdr-btn" id="updateBtn" onclick="restartServer()" title="Restart Server">&#8635;</button>
+  <button class="hdr-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+</header>
+
+<main>
+  <div class="sidebar">
+    <h3 style="display:flex;justify-content:space-between;align-items:center;">Files <span id="sidebarProjectName" style="font-weight:400;font-size:9px;color:var(--accent);cursor:pointer;text-transform:none;letter-spacing:0;" onclick="openFolderInFinder()" title="Open in Finder"></span></h3>
+    <div class="sidebar-actions">
+      <button class="sa-btn" onclick="importFiles()" title="Import files into project"><span class="sa-icon">+</span>Import</button>
+      <button class="sa-btn" onclick="importZipAsProject()" title="Create new project from ZIP"><span class="sa-icon">&#9634;</span>ZIP</button>
+      <button class="sa-btn" onclick="exportAll()" title="Export project with all files"><span class="sa-icon">&#8615;</span>Export</button>
+      <button class="sa-btn" onclick="exportVLOnly()" title="Export VL files only"><span class="sa-icon">&#8615;</span>VL</button>
+      <button class="sa-btn sa-danger" onclick="clearAllFiles()" title="Remove all files"><span class="sa-icon">&times;</span>Clear</button>
+    </div>
+    <div class="file-tree" id="fileTree"></div>
+    <div class="project-config" id="projectConfigPanel">
+      <h4 class="pc-header" onclick="$('pcFiles').style.display=$('pcFiles').style.display==='none'?'block':'none'">Project <span style="float:right;font-size:8px;">&#9660;</span></h4>
+      <div class="pc-files" id="pcFiles">
+        <div class="pc-file" onclick="openFile('.vl-code/VL.md')" title="Project instructions for AI">VL.md</div>
+      </div>
+    </div>
+    <div class="project-config" id="vlDocsPanel">
+      <h4 class="pc-header" onclick="$('vlDocsList').style.display=$('vlDocsList').style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;">
+        VL Reference Docs
+        <span style="display:flex;gap:4px;align-items:center;">
+          <button class="pc-sync-btn" onclick="event.stopPropagation();syncVLDocs()" title="Sync docs from DocCenter">&#8635;</button>
+          <span style="font-size:8px;">&#9660;</span>
+        </span>
+      </h4>
+      <div class="pc-files" id="vlDocsList" style="display:none;"></div>
+    </div>
+    <div class="preview-urls" id="previewUrlsPanel" style="display:none">
+      <h4>App Previews</h4>
+      <div id="previewUrlsList"></div>
+    </div>
+  </div>
+  <div class="content">
+    <div class="panels">
+      <div class="editor-panel">
+        <div class="mode-tabs" id="modeTabs">
+          <div class="mode-tab active" data-mode="code" onclick="switchMode('code')">Code</div>
+          <div class="mode-tab" data-mode="meta" onclick="switchMode('meta')">Meta Map</div>
+          <div class="mode-tab" data-mode="flow" onclick="switchMode('flow')">Flow Editor</div>
+          <div class="mode-tab" data-mode="preview" id="previewModeTab" onclick="switchMode('preview')" style="display:none">Preview</div>
+        </div>
+        <div class="preview-bar" id="previewBar" style="display:none;">
+          <select id="previewAppSelect" onchange="loadPreviewApp()"></select>
+          <span class="preview-url" id="previewUrlLabel"></span>
+          <button class="preview-btn" onclick="refreshPreview()">Refresh</button>
+          <button class="preview-btn" onclick="openPreviewExternal()">Open External</button>
+        </div>
+        <div class="flow-toolbar" id="flowToolbar" style="display:none;">
+          <div class="flow-sub-tabs">
+            <div class="flow-sub-tab active" data-flow="generate" onclick="switchFlowTab('generate')">Generate</div>
+            <div class="flow-sub-tab" data-flow="adjust" onclick="switchFlowTab('adjust')">Adjust</div>
+          </div>
+          <div class="flow-actions">
+            <select id="flowWfSelect" onchange="loadFlowWorkflow(this.value)" title="Select workflow">
+              <option value="">-- Select Workflow --</option>
+            </select>
+            <button class="flow-btn" onclick="importFlowJson()" title="Load workflow JSON from file">Load JSON</button>
+            <input type="file" id="flowJsonInput" accept=".json" style="display:none">
+            <button class="flow-btn flow-btn-run" id="flowRunBtn" onclick="runFlowWorkflow()" title="Execute selected workflow">&#9654; Run</button>
+            <span class="flow-run-status" id="flowRunStatus"></span>
+          </div>
+        </div>
+        <div class="editor-tabs" id="editorTabs"></div>
+        <div class="editor-area">
+          <div id="cmEditorWrap" style="display:none;width:100%;height:100%;"></div>
+          <textarea id="editor" spellcheck="false" style="display:none"></textarea>
+          <div class="code-preview" id="codePreview"><pre></pre></div>
+          <div class="md-preview" id="mdPreview"></div>
+          <div class="iframe-container" id="iframeContainer"></div>
+          <div class="editor-placeholder" id="editorPlaceholder">
+            Click a file in the tree to view &amp; edit<br>
+            <span style="font-size:11px;color:var(--text2)">Use Load button to open a project folder</span>
+          </div>
+        </div>
+      </div>
+      <div class="chat-panel" id="chatPanel">
+        <div class="chat-resize-handle" id="chatResizeHandle"></div>
+        <div class="chat-header" onclick="if(document.querySelector('.chat-panel').classList.contains('collapsed'))toggleChatCollapse()">
+          <span>AI Assistant</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span id="chatModel"></span>
+            <button onclick="event.stopPropagation();clearChatHistory()" title="Clear chat history" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;padding:2px 6px;border-radius:3px;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text2)'">&times;</button>
+            <button class="chat-collapse-btn" onclick="event.stopPropagation();toggleChatCollapse()" title="Collapse/Expand chat">&#9664;</button>
+          </div>
+        </div>
+        <div class="chat-actions" id="chatActions">
+          <button class="ca-btn" onclick="compileProject()">Compile</button>
+          <button class="ca-btn" onclick="sendSkillCmd('validate-all')">Validate</button>
+          <button class="ca-btn" onclick="sendSkillCmd('blueprint')">Blueprint</button>
+          <button class="ca-btn" onclick="sendSkillCmd('deploy')">Deploy</button>
+          <button class="ca-btn" onclick="openSettings()">Settings</button>
+        </div>
+        <div class="conv-tabs" id="convTabs">
+          <div class="conv-tab active" data-conv="0">Chat 1</div>
+          <button class="conv-new" onclick="newConversation()" title="New conversation">+</button>
+        </div>
+        <div class="chat-search" id="chatSearch">
+          <input id="chatSearchInput" placeholder="Search conversation..." oninput="searchConversation(this.value)">
+          <span class="search-count" id="searchCount"></span>
+          <button class="input-btn" onclick="closeChatSearch()" style="font-size:12px">&times;</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-area" style="position:relative;">
+          <div class="skill-palette" id="skillPalette"></div>
+          <div class="mention-dropdown" id="mentionDropdown"></div>
+          <div class="chat-attachments" id="chatAttachments"></div>
+          <div class="chat-input-row">
+            <button class="input-btn" onclick="$('imageInput').click()" title="Attach image">&#128247;</button>
+            <input id="chatInput" placeholder="Describe changes, @mention files, /skill..." autocomplete="off">
+            <button class="send-btn" id="chatSend" onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+        <input type="file" id="imageInput" accept="image/*" multiple style="display:none">
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="bottom-bar">
+  <div class="status"><div class="dot dot-green"></div> <span id="statusText">Ready</span></div>
+  <span id="fileCount"></span>
+  <span id="currentFile"></span>
+  <span style="margin-left:auto" id="modelLabel"></span>
+</div>
+
+<!-- Drop overlay -->
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-msg">
+    <h2>Drop Files or Folder</h2>
+    <p>.vx .sc .cp .vs .vdb .vth .json .zip</p>
+  </div>
+</div>
+
+<input type="file" id="folderInput" webkitdirectory directory multiple style="display:none">
+<input type="file" id="zipInput" accept=".zip" style="display:none">
+
+<!-- File context menu -->
+<div class="ctx-menu" id="fileCtxMenu">
+  <div class="ctx-menu-item" onclick="ctxOpenFile()">Open</div>
+  <div class="ctx-menu-sep"></div>
+  <div class="ctx-menu-item danger" onclick="ctxDeleteFile()">Delete File</div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box">
+    <h2>Settings</h2>
+    <label>API Key</label>
+    <div class="key-row">
+      <input type="password" id="settingsKey" placeholder="sk-ant-api03-...">
+      <button class="hdr-btn" onclick="toggleKeyVisibility()">Show</button>
+    </div>
+    <div class="key-status" id="keyStatus"></div>
+    <label>Model</label>
+    <select id="settingsModel">
+      <option value="claude-opus-4-6">Claude Opus 4.6 (Most capable)</option>
+      <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Faster)</option>
+      <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Fastest)</option>
+    </select>
+    <label>Max Output Tokens</label>
+    <input type="text" id="settingsMaxTokens" placeholder="16000">
+    <label>VL Platform Cookie <span style="font-size:9px;color:var(--text2)">(for preview/deploy)</span></label>
+    <input type="text" id="settingsCookie" placeholder="ih5_player_12027065=eyJhb..." style="font-size:10px;">
+    <label>Working Directory</label>
+    <input type="text" id="settingsWorkDir" disabled style="opacity:0.6">
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+      <label>Server</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="settingsVersion" style="font-size:11px;color:var(--text2);"></span>
+        <button class="hdr-btn" onclick="restartServer();closeSettings();" style="font-size:10px;">Restart Server</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="hdr-btn" onclick="closeSettings()">Cancel</button>
+      <button class="hdr-btn hdr-btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generate Modal -->
+<div class="modal-overlay" id="genModal">
+  <div class="modal-box">
+    <h2>Generate VL Project</h2>
+    <textarea id="genInput" placeholder="Describe your application...&#10;&#10;Example: Build a streaming video app with user profiles, video catalog, and episode lists."></textarea>
+    <div class="gen-progress" id="genProgress" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="hdr-btn" onclick="closeGenerate()">Cancel</button>
+      <button class="hdr-btn hdr-btn-primary" id="genStart" onclick="startGenerate()">Generate</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentFile = null;
+let openFiles = new Map(); // key → { type:'file'|'workflow'|'metadata', content?, title?, data? }
+let activeToolGroup = null;
+let ctxMenuTarget = null; // path of right-clicked file
+let currentMode = 'code'; // 'code' | 'meta' | 'flow'
+let currentWorkDir = '';   // workspace folder path
+let workflowBindings = { generate: '3-file-codegen', adjust: 'incremental-update' }; // workflow ID bindings
+let flowRunning = false; // true while a workflow is executing
+const $ = id => document.getElementById(id);
+
+// ===================== CODEMIRROR SETUP =====================
+
+// Define VL syntax mode for CodeMirror
+CodeMirror.defineMode('vl', function() {
+  const keywords = new Set([
+    'APP','SECTION','COMPONENT','SERVICE','PUBLIC_SERVICE','HANDLER','METHOD','METHOD_PUB',
+    'TABLE','VT','VIRTUAL_TABLE','INDEX','RETURN','IF','ELSE','ELSEIF','FOR','IN','SET',
+    'CALL','GOTO','WHILE','BREAK','CONTINUE','ENUM','NAV','ROUTE','DEVICE_TARGET',
+    'SCREEN_RESOLUTION','STYLE','THEME','EVENT','DATA','FIELD','TRIGGER','BLOCK','TIMER',
+    'TEMPLATE','QUERY','PARAM','COMPUTED','EMIT','USE','DEFAULT','FROM','PUSH','REMOVE',
+    'MATCH','CONDITIONS','ALERT','CONFIRM','NAVIGATE','DISMISS','OPEN','CLOSE',
+    'sourceArray','loopVar','conditions','returns','params','value','options','label',
+    'placeholder','sourceTable','notNull','type','min-height','min-width',
+  ]);
+  const types = new Set([
+    'STRING','INT','FLOAT','BOOL','BOOLEAN','NUMBER','TIMESTAMP','OBJECT','ARRAY','NULL',
+    'UNIQUE','NORMAL','JSON','LIST','MAP','DATE','TEXT','DECIMAL',
+  ]);
+  const boolLit = new Set(['true','false','null','undefined']);
+
+  // Style attributes that appear as key:value (e.g. padding:"12px", gap:"8px")
+  const styleProps = new Set([
+    'padding','margin','gap','width','height','display','flex','color','background-color',
+    'background','border','border-radius','border-width','border-style','border-color',
+    'font-size','font-weight','font-family','text-transform','text-align','text-decoration',
+    'justify-content','align-items','flex-direction','flex-wrap','overflow','opacity',
+    'position','top','left','right','bottom','z-index','cursor','transition','box-shadow',
+    'margin-top','margin-bottom','margin-left','margin-right','padding-top','padding-bottom',
+    'padding-left','padding-right','border-bottom','border-top','border-left','border-right',
+    'max-width','max-height','min-width','min-height','line-height','letter-spacing',
+    'object-fit','white-space','word-break','text-overflow',
+  ]);
+
+  return {
+    startState: function() { return { inTag: false }; },
+    token: function(stream, state) {
+      if (stream.eatSpace()) return null;
+
+      // === VL tree dashes (indent markers) ===
+      if (stream.sol() && stream.match(/^-+(?=\s|<|$)/)) return 'qualifier';
+
+      // === Section headers: # Name, ## Frontend Tree, etc. ===
+      if (stream.sol() && stream.match(/^#{1,3}\s+.*/)) return 'section-header';
+
+      // === Comments ===
+      if (stream.match(/^\/\/.*/)) return 'comment';
+
+      // === Tags: <Component-X>, <Text-Title>, </Row>, <ServiceDomain-Bet> ===
+      if (stream.match(/^<\/?[\w-]+/)) { state.inTag = true; return 'tag'; }
+      if (state.inTag) {
+        if (stream.eat('>')) { state.inTag = false; return 'tag'; }
+        if (stream.match(/^"[^"]*"/)) return 'string';
+        // key:value attributes inside tags (e.g. type:INT, sourceTable:Users)
+        if (stream.match(/^[\w-]+(?=:)/)) return 'attribute';
+        if (stream.eat(':')) return 'punctuation';
+        // remaining words inside tag are attribute values
+        if (stream.match(/^[\w.-]+/)) return 'variable';
+        stream.next();
+        return null;
+      }
+
+      // === $variables ===
+      if (stream.match(/^\$\w+/)) return 'variable-2';
+      // === @events / @handlers ===
+      if (stream.match(/^@\w+/)) return 'def';
+
+      // === Strings ===
+      if (stream.match(/^"(?:[^"\\]|\\.)*"/)) return 'string';
+      if (stream.match(/^'(?:[^'\\]|\\.)*'/)) return 'string';
+
+      // === Numbers ===
+      if (stream.match(/^-?\d+(\.\d+)?(?!\w)/)) return 'number';
+
+      // === CSS variables: --colorBrandPrimary ===
+      if (stream.match(/^--[\w-]+/)) return 'atom';
+
+      // === Hex colors: #1a1a1a ===
+      if (stream.match(/^#[0-9a-fA-F]{3,8}\b/)) return 'number';
+
+      // === Word tokens (keywords, types, identifiers, properties) ===
+      if (stream.match(/^[\w-]+/)) {
+        const w = stream.current();
+        // Check keywords
+        if (keywords.has(w)) return 'keyword';
+        // Check types
+        if (types.has(w)) return 'type';
+        // Check booleans
+        if (boolLit.has(w)) return 'atom';
+        // Service.Method pattern: word followed by . and another word
+        if (stream.peek() === '.' && stream.match(/^\.[\w]+(?=\s*\()/)) return 'def';
+        // Property key before colon (e.g. padding: gap: font-size:)
+        if (stream.peek() === ':') return 'property';
+        // Style property names
+        if (styleProps.has(w)) return 'property';
+        // Known VL identifiers look-ahead: all-uppercase is likely a keyword/type we missed
+        if (/^[A-Z][A-Z_]+$/.test(w)) return 'keyword';
+        // PascalCase words are likely component/section/type references
+        if (/^[A-Z][a-z]/.test(w)) return 'variable-3';
+        // everything else — use default text color (light, visible)
+        return 'variable';
+      }
+
+      // === Operators & punctuation ===
+      if (stream.match(/^[(){}[\]]/)) return 'bracket';
+      if (stream.match(/^[=!<>]+/)) return 'operator';
+      if (stream.match(/^[,:;|&+*/%-]/)) return 'punctuation';
+
+      // Fallback: advance one char, return visible style
+      stream.next();
+      return 'variable';
+    }
+  };
+});
+
+// Register file extension → CodeMirror mode mapping
+const CM_MODE_MAP = {
+  'vx': 'vl', 'sc': 'vl', 'cp': 'vl', 'vs': 'vl', 'vdb': 'vl', 'vth': 'vl',
+  'js': 'javascript', 'mjs': 'javascript', 'cjs': 'javascript',
+  'json': { name: 'javascript', json: true },
+  'css': 'css',
+  'html': 'htmlmixed', 'htm': 'htmlmixed',
+  'xml': 'xml', 'svg': 'xml',
+  'md': 'text/plain', 'txt': 'text/plain',
+};
+
+function getCmMode(filePath) {
+  const ext = (filePath || '').split('.').pop().toLowerCase();
+  return CM_MODE_MAP[ext] || 'text/plain';
+}
+
+// Global CodeMirror editor instance
+let cmEditor = null;
+
+function initCodeMirror() {
+  if (cmEditor) return;
+  if (typeof CodeMirror === 'undefined') {
+    console.warn('CodeMirror not loaded, using textarea fallback');
+    cmEditor = null;
+    return;
+  }
+  cmEditor = CodeMirror($('cmEditorWrap'), {
+    value: '',
+    mode: 'vl',
+    theme: 'default',
+    lineNumbers: true,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    styleActiveLine: true,
+    indentUnit: 2,
+    tabSize: 2,
+    indentWithTabs: false,
+    lineWrapping: false,
+    foldGutter: true,
+    gutters: ['CodeMirror-linenumber', 'CodeMirror-foldgutter'],
+    extraKeys: {
+      'Cmd-S': function() { saveCurrentFile(); },
+      'Ctrl-S': function() { saveCurrentFile(); },
+      'Tab': function(cm) {
+        if (cm.somethingSelected()) cm.indentSelection('add');
+        else cm.replaceSelection('  ', 'end');
+      },
+    }
+  });
+  // Track changes: update openFiles map
+  cmEditor.on('change', function() {
+    if (currentFile && openFiles.has(currentFile)) {
+      const info = openFiles.get(currentFile);
+      if (info.type === 'file') info.content = cmEditor.getValue();
+    }
+  });
+}
+
+// Chat state
+let pendingImages = [];     // [{data: base64, mediaType, preview}]
+let pendingMentions = [];   // [filename]
+let allFileNames = [];      // for @-mention autocomplete
+let mentionIdx = -1;        // selected autocomplete index
+
+// Multi-conversation state — persisted in localStorage
+let conversations = [{ id: 0, name: 'Chat 1', messages: [] }];
+let activeConvId = 0;
+let convIdCounter = 1;
+
+function chatStorageKey(wsPath) {
+  const p = wsPath || currentWorkDir || '_global';
+  return 'vl-code-chat:' + p;
+}
+
+function saveChatState(wsPath) {
+  try {
+    const cur = conversations.find(c => c.id === activeConvId);
+    if (cur) cur.dom = $('chatMessages')?.innerHTML || '';
+    const state = { conversations, activeConvId, convIdCounter };
+    localStorage.setItem(chatStorageKey(wsPath), JSON.stringify(state));
+  } catch {}
+}
+
+function loadChatState(wsPath) {
+  try {
+    const key = chatStorageKey(wsPath);
+    const raw = localStorage.getItem(key);
+    // Also try migrating old global key on first load
+    const fallback = !wsPath && !raw ? localStorage.getItem('vl-code-chat') : null;
+    const data = raw || fallback;
+    if (!data) return;
+    const state = JSON.parse(data);
+    if (state.conversations?.length) {
+      conversations = state.conversations;
+      activeConvId = state.activeConvId || 0;
+      convIdCounter = state.convIdCounter || conversations.length;
+      const cur = conversations.find(c => c.id === activeConvId);
+      if (cur?.dom && $('chatMessages')) {
+        $('chatMessages').innerHTML = cur.dom;
+      }
+      renderConvTabs();
+    }
+    // Clean up old global key after migration
+    if (fallback) localStorage.removeItem('vl-code-chat');
+  } catch {}
+}
+
+function clearChatHistory() {
+  if (!confirm('Clear all chat history for this workspace?')) return;
+  localStorage.removeItem(chatStorageKey());
+  conversations = [{ id: 0, name: 'Chat 1', messages: [] }];
+  activeConvId = 0;
+  convIdCounter = 1;
+  $('chatMessages').innerHTML = '';
+  renderConvTabs();
+}
+
+// ===================== CHAT PANEL: RESIZE + COLLAPSE =====================
+let chatWidth = parseInt(localStorage.getItem('vl-chat-width') || '400');
+
+function applyChatWidth(w) {
+  chatWidth = Math.max(300, Math.min(800, w));
+  const panel = $('chatPanel');
+  if (panel.classList.contains('collapsed')) return;
+  panel.style.width = chatWidth + 'px';
+  document.querySelector('header').style.marginRight = chatWidth + 'px';
+  document.querySelector('.panels').style.marginRight = chatWidth + 'px';
+  localStorage.setItem('vl-chat-width', String(chatWidth));
+}
+
+(function initChatResize() {
+  document.addEventListener('DOMContentLoaded', () => {
+    applyChatWidth(chatWidth);
+    const handle = $('chatResizeHandle');
+    if (!handle) return;
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      this.classList.add('dragging');
+      const startX = e.clientX, startW = chatWidth;
+      function onMove(ev) { applyChatWidth(startW + (startX - ev.clientX)); }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        handle.classList.remove('dragging');
+        if (typeof cmEditor !== 'undefined' && cmEditor) cmEditor.refresh();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+})();
+
+function toggleChatCollapse() {
+  const panel = $('chatPanel');
+  const isCollapsed = panel.classList.toggle('collapsed');
+  const w = isCollapsed ? 36 : chatWidth;
+  panel.style.width = w + 'px';
+  document.querySelector('header').style.marginRight = w + 'px';
+  document.querySelector('.panels').style.marginRight = w + 'px';
+  // Update collapse button arrow direction
+  const btn = panel.querySelector('.chat-collapse-btn');
+  if (btn) btn.innerHTML = isCollapsed ? '&#9654;' : '&#9664;';
+  if (!isCollapsed && typeof cmEditor !== 'undefined' && cmEditor) cmEditor.refresh();
+}
+
+function sendSkillCmd(name) {
+  $('chatInput').value = '/' + name;
+  sendMessage();
+}
+
+// ===================== INIT =====================
+async function init() {
+  const settings = await api('/api/settings');
+  if (!settings.apiKeySet) {
+    $('setupOverlay').classList.add('active');
+    return;
+  }
+
+  await loadProjectInfo();  // Sets currentWorkDir
+  loadChatState();          // Restore per-workspace chat from localStorage
+  await loadFileTree();
+  await loadWorkspaces();
+  loadWorkflowBindings();
+  await loadWorkflowList();
+  loadPreviewUrlsFromProfile(); // Show Preview tab if previously compiled
+  loadVLDocs(); // Load cached VL reference docs in sidebar
+  updateContext();
+  connectSSE();
+  setupImagePaste();
+  // Auto-save chat every 5 seconds
+  setInterval(saveChatState, 5000);
+  // Auto-open first VL file on startup
+  autoOpenFirstFile();
+}
+
+async function loadProjectInfo() {
+  const proj = await api('/api/project');
+  const vlCount = proj.summary?.totalFiles || 0;
+  $('projectInfo').textContent = proj.isVL
+    ? `${proj.summary?.projectName || 'VL Project'} · ${vlCount} files`
+    : proj.workDir;
+  $('chatModel').textContent = shortModel(proj.model);
+  if (proj.version) $('appVersion').textContent = 'v' + proj.version;
+  $('modelLabel').textContent = shortModel(proj.model);
+  // Update workspace display
+  if (proj.workDir) {
+    currentWorkDir = proj.workDir;
+    const wsName = proj.summary?.projectName || path_basename(proj.workDir);
+    if ($('sidebarProjectName')) $('sidebarProjectName').textContent = wsName;
+  }
+}
+
+function shortModel(m) {
+  if (m?.includes('opus')) return 'Opus 4.6';
+  if (m?.includes('sonnet')) return 'Sonnet 4.6';
+  if (m?.includes('haiku')) return 'Haiku 4.5';
+  return m || '';
+}
+
+// ===================== SETUP KEY =====================
+async function submitSetupKey() {
+  const key = $('setupKey').value.trim();
+  if (!key) return;
+  const res = await fetch('/api/settings', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ apiKey: key })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    $('setupOverlay').classList.remove('active');
+    await loadProjectInfo();
+    await loadFileTree();
+    updateContext();
+    connectSSE();
+  }
+}
+
+$('setupKey').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitSetupKey();
+});
+
+// ===================== WORKSPACE =====================
+async function loadWorkspaces() {
+  try {
+    const data = await api('/api/workspaces');
+    renderWsTabs(data.workspaces);
+    renderWsListInPopover(data.workspaces);
+    const active = data.workspaces.find(w => w.active);
+    const name = active ? active.name : path_basename(currentWorkDir);
+    if ($('sidebarProjectName')) $('sidebarProjectName').textContent = name;
+  } catch {}
+}
+
+function renderWsTabs(workspaces) {
+  const container = $('wsTabs');
+  container.innerHTML = '';
+  const tabCount = workspaces.length;
+  const maxW = tabCount > 8 ? '100px' : tabCount > 5 ? '140px' : '180px';
+  for (const ws of workspaces) {
+    const tab = document.createElement('div');
+    tab.className = 'ws-tab' + (ws.active ? ' active' : '');
+    tab.title = ws.path;
+    tab.style.maxWidth = maxW;
+    tab.innerHTML = `<span class="ws-tab-name">${escapeHtml(ws.name)}</span><span class="ws-tab-close" onclick="event.stopPropagation();deleteWorkspace('${ws.id}')">&times;</span>`;
+    tab.onclick = () => { if (!ws.active) switchWorkspace(ws.path); };
+    container.appendChild(tab);
+  }
+}
+
+function renderWsListInPopover(workspaces) {
+  const list = $('wsList');
+  list.innerHTML = '';
+  for (const ws of workspaces) {
+    const div = document.createElement('div');
+    div.className = 'ws-item' + (ws.active ? ' active' : '');
+    div.innerHTML = `<div><div class="ws-item-name">${escapeHtml(ws.name)}</div><div class="ws-item-path">${escapeHtml(ws.path)}</div></div><span class="ws-del" onclick="event.stopPropagation();deleteWorkspace('${ws.id}')">&times;</span>`;
+    div.onclick = () => { $('wsPopover').classList.remove('open'); switchWorkspace(ws.path); };
+    list.appendChild(div);
+  }
+}
+
+function toggleWsPopover() {
+  const pop = $('wsPopover');
+  pop.classList.toggle('open');
+  if (pop.classList.contains('open') && !_browseCurrentDir) {
+    const startDir = currentWorkDir ? currentWorkDir.split('/').slice(0, -1).join('/') : '';
+    browseDir(startDir || '');
+  }
+}
+
+// Horizontal wheel scroll for workspace tabs
+document.addEventListener('DOMContentLoaded', () => {
+  const wt = $('wsTabs');
+  if (wt) wt.addEventListener('wheel', function(e) { if (e.deltaY) { this.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ws-popover') && !e.target.closest('.ws-tab-add')) $('wsPopover').classList.remove('open');
+  if (!e.target.closest('.mention-dropdown') && !e.target.closest('#chatInput')) $('mentionDropdown').classList.remove('open');
+});
+
+async function addWorkspace() {
+  const dirPath = $('wsAddPath').value.trim();
+  if (!dirPath) return;
+  $('wsAddPath').value = '';
+  // If user typed a path, try browsing to it first; if valid dir, navigate the browser
+  try {
+    const data = await api(`/api/browse-dir?path=${encodeURIComponent(dirPath)}`);
+    if (data.current) {
+      browseDir(data.current);
+      return;
+    }
+  } catch {}
+  // Fallback: add as workspace and switch to it
+  await switchWorkspace(dirPath);
+}
+
+async function switchWorkspace(dirPath) {
+  setStatus('Switching workspace...', 'yellow');
+  $('wsPopover').classList.remove('open');
+  try {
+    // 1. Save current workspace's chat history before leaving
+    saveChatState();
+    const oldWorkDir = currentWorkDir;
+
+    const switchRes = await fetch('/api/workspaces/switch', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ dirPath }) });
+    if (!switchRes.ok) { const err = await switchRes.json().catch(() => ({})); throw new Error(err.error || 'Server switch failed'); }
+
+    // 2. Close all open file tabs (they belong to old workspace)
+    openFiles.clear();
+    currentFile = null;
+    renderTabs();
+    $('editor').style.display = 'none';
+    $('codePreview').style.display = 'none';
+    $('mdPreview').style.display = 'none';
+    $('iframeContainer').style.display = 'none';
+    $('editorPlaceholder').style.display = 'block';
+    $('currentFile').textContent = '';
+
+    // 3. Destroy all cached iframes (metadata/workflow from old workspace)
+    const container = $('iframeContainer');
+    container.innerHTML = '';
+
+    // 4. Switch back to code mode
+    currentMode = 'code';
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'code'));
+
+    // 5. Reload everything from the new workspace
+    await loadProjectInfo();
+    await loadFileTree();
+    await loadWorkspaces();
+    updateContext();
+
+    // 6. Restore chat history for the new workspace (or start fresh)
+    $('chatMessages').innerHTML = '';
+    conversations = [{ id: 0, name: 'Chat 1', messages: [] }];
+    activeConvId = 0;
+    convIdCounter = 1;
+    loadChatState(); // loads per-workspace chat if it exists
+    renderConvTabs();
+
+    // 7. Auto-open the first VL file in the new workspace
+    autoOpenFirstFile();
+    setStatus('Ready', 'green');
+  } catch(e) { console.error('switchWorkspace error:', e); setStatus('Switch failed: ' + (e.message || e), 'red'); }
+}
+
+async function deleteWorkspace(id) {
+  await fetch(`/api/workspaces/${id}`, { method:'DELETE' });
+  await loadWorkspaces();
+}
+
+function path_basename(p) { return p ? p.split('/').pop() || p : 'No workspace'; }
+
+// ===================== VL REFERENCE DOCS =====================
+async function loadVLDocs() {
+  try {
+    const data = await api('/api/vl-docs');
+    renderVLDocs(data.docs || []);
+  } catch {}
+}
+
+function renderVLDocs(docs) {
+  const list = $('vlDocsList');
+  if (!list) return;
+  if (!docs.length) {
+    list.innerHTML = '<div style="padding:4px 12px;font-size:10px;color:var(--text2);">No docs cached. Click &#8635; to sync from DocCenter.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  for (const doc of docs) {
+    const el = document.createElement('div');
+    el.className = 'pc-file';
+    el.title = doc.path || doc.name;
+    el.innerHTML = `<span onclick="viewVLDoc(${doc.id})" style="cursor:pointer;flex:1;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(doc.name)}</span>` +
+      `<button class="pc-doc-toggle ${doc.active ? 'active' : ''}" onclick="event.stopPropagation();toggleVLDoc(${doc.id},${!doc.active})" title="${doc.active ? 'Active (in AI context)' : 'Inactive (not in AI context)'}">` +
+      `${doc.active ? '&#9679;' : '&#9675;'}</button>`;
+    list.appendChild(el);
+  }
+}
+
+async function syncVLDocs() {
+  setStatus('Syncing VL docs from DocCenter...', 'yellow');
+  try {
+    const res = await fetch('/api/vl-docs/sync', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) { setStatus('Sync failed: ' + data.error, 'red'); return; }
+    renderVLDocs(data.docs || []);
+    $('vlDocsList').style.display = 'block';
+    setStatus(`Synced ${data.synced} VL docs`, 'green');
+  } catch (e) { setStatus('Sync failed: ' + e.message, 'red'); }
+}
+
+async function toggleVLDoc(docId, active) {
+  try {
+    await fetch('/api/vl-docs/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ docId, active }) });
+    await loadVLDocs();
+  } catch {}
+}
+
+async function viewVLDoc(docId) {
+  try {
+    const data = await api('/api/vl-docs');
+    const doc = (data.docs || []).find(d => d.id === docId);
+    if (!doc) return;
+    // Open doc content in editor as read-only preview
+    const res = await fetch(`/api/vl-docs/content?file=${encodeURIComponent(doc.file)}`);
+    const content = await res.text();
+    addMsg('assistant', `**${doc.name}**\n\`\`\`\n${content.substring(0, 2000)}\n\`\`\`${content.length > 2000 ? '\n...(truncated)' : ''}`);
+  } catch {}
+}
+
+// ===================== DIRECTORY BROWSER =====================
+let _browseCurrentDir = '';
+
+async function browseDir(dirPath) {
+  try {
+    const params = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
+    const data = await api(`/api/browse-dir${params}`);
+    _browseCurrentDir = data.current;
+    $('browsePath').textContent = data.current;
+    $('browsePath').title = data.current;
+    const list = $('browseList');
+    list.innerHTML = '';
+    if (!data.dirs.length) {
+      list.innerHTML = '<div style="padding:8px 12px;font-size:10px;color:var(--text2);">No subdirectories</div>';
+      return;
+    }
+    for (const d of data.dirs) {
+      const div = document.createElement('div');
+      div.className = 'ws-browse-item' + (d.isVL ? ' is-vl' : '');
+      div.innerHTML = `<span class="dir-icon">${d.isVL ? '&#9670;' : '&#128193;'}</span><span class="dir-name">${escapeHtml(d.name)}</span>${d.isVL ? '<span class="dir-vl">VL</span>' : ''}`;
+      div.onclick = (e) => { e.stopPropagation(); browseDir(d.path); };
+      div.ondblclick = (e) => { e.stopPropagation(); switchWorkspace(d.path); };
+      div.title = d.path + (d.isVL ? ' (VL Project — double-click to open)' : ' (click to browse, double-click to open)');
+      list.appendChild(div);
+    }
+  } catch (e) {
+    $('browseList').innerHTML = `<div style="padding:8px 12px;font-size:10px;color:var(--red);">Error: ${escapeHtml(e.message || 'Failed to browse')}</div>`;
+  }
+}
+
+function browseDirUp() {
+  if (!_browseCurrentDir) return;
+  const parent = _browseCurrentDir.split('/').slice(0, -1).join('/') || '/';
+  browseDir(parent);
+}
+
+function selectBrowseDir() {
+  if (_browseCurrentDir) switchWorkspace(_browseCurrentDir);
+}
+
+// Directory browser auto-load is now handled inside toggleWsPopover()
+
+// ===================== SETTINGS =====================
+async function openSettings() {
+  const s = await api('/api/settings');
+  $('settingsKey').value = '';
+  $('settingsKey').placeholder = s.apiKeySet ? s.apiKey : 'sk-ant-api03-...';
+  $('settingsModel').value = s.model;
+  $('settingsMaxTokens').value = s.maxOutputTokens;
+  $('settingsWorkDir').value = s.workDir;
+  $('settingsCookie').value = s.cookie || localStorage.getItem('vl-code-cookie') || '';
+  $('keyStatus').innerHTML = s.apiKeySet
+    ? '<span class="key-ok">Key configured</span>'
+    : '<span class="key-missing">No API key set</span>';
+  $('settingsVersion').textContent = `VL-Code v${$('appVersion')?.textContent?.replace('v','') || '?'}`;
+  $('settingsModal').classList.add('open');
+}
+
+function closeSettings() { $('settingsModal').classList.remove('open'); }
+
+function toggleKeyVisibility() {
+  const inp = $('settingsKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+async function saveSettings() {
+  const body = {};
+  const key = $('settingsKey').value.trim();
+  if (key) body.apiKey = key;
+  body.model = $('settingsModel').value;
+  body.maxOutputTokens = parseInt($('settingsMaxTokens').value) || 16000;
+  // Save cookie
+  const cookie = $('settingsCookie').value.trim();
+  if (cookie) {
+    body.cookie = cookie;
+    localStorage.setItem('vl-code-cookie', cookie);
+  }
+
+  await fetch('/api/settings', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  closeSettings();
+  await loadProjectInfo();
+  setStatus('Settings saved', 'green');
+}
+
+// ===================== FILE TREE =====================
+async function loadFileTree() {
+  try {
+    const data = await api('/api/files');
+    const tree = $('fileTree');
+    tree.innerHTML = '';
+    const order = ['root','Apps','Sections','ExtComponents','Services','Database','Theme','Process','.vl-code'];
+    const sorted = Object.entries(data.tree).sort((a,b) => {
+      const ai = order.indexOf(a[0]), bi = order.indexOf(b[0]);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+    for (const [cat, files] of sorted) {
+      const div = document.createElement('div');
+      div.className = 'category';
+      div.innerHTML = `<div class="cat-name">${cat === 'root' ? './' : cat + '/'}</div>`;
+      for (const f of files) {
+        const type = getType(f);
+        const el = document.createElement('div');
+        el.className = 'file';
+        const fp = cat === 'root' ? f : `${cat}/${f}`;
+        el.dataset.path = fp;
+        el.innerHTML = `<span class="type-badge type-${type}">${type.substring(0,3)}</span>${f}`;
+        el.onclick = () => openFile(fp);
+        el.oncontextmenu = (e) => showFileCtxMenu(e, fp);
+        div.appendChild(el);
+      }
+      tree.appendChild(div);
+    }
+    $('fileCount').textContent = `${data.files.length} files`;
+  } catch {}
+}
+
+function getType(name) {
+  const ext = name.split('.').pop();
+  return {vx:'app',sc:'section',cp:'component',vs:'service',vdb:'database',vth:'theme',json:'json',md:'doc',txt:'doc'}[ext] || 'doc';
+}
+
+// ===================== EDITOR =====================
+async function openFile(fpath) {
+  try {
+    const data = await api(`/api/file?path=${encodeURIComponent(fpath)}`);
+    const content = (data.content || '').split('\n').map(l => l.replace(/^\s*\d+\t/, '')).join('\n');
+    // Clear all previous file tabs (no caching) — keep only special tabs
+    for (const [k, v] of openFiles) {
+      if (v.type === 'file') openFiles.delete(k);
+    }
+    openFiles.set(fpath, { type: 'file', content });
+    currentFile = fpath;
+    // Switch to code mode if in meta/flow mode
+    if (currentMode !== 'code') switchMode('code');
+    renderTabs();
+    showTabContent(fpath);
+    document.querySelectorAll('.file').forEach(el => el.classList.toggle('active', el.dataset.path === fpath));
+    $('currentFile').textContent = fpath;
+  } catch (err) {
+    console.error('openFile failed:', fpath, err);
+    setStatus('Failed to open ' + fpath.split('/').pop(), 'red');
+  }
+}
+
+/** Open a special (non-file) tab: workflow DAG or metadata graph */
+function openSpecialTab(key, type, title, data) {
+  openFiles.set(key, { type, title, data });
+  currentFile = key;
+  renderTabs();
+  showTabContent(key);
+  $('currentFile').textContent = title;
+}
+
+/** Close a tab by key */
+function closeTab(key, evt) {
+  if (evt) evt.stopPropagation();
+  openFiles.delete(key);
+  // Clean up iframe if it was a special tab
+  const iframe = $('iframeContainer').querySelector(`iframe[data-tab="${key}"]`);
+  if (iframe) iframe.remove();
+  // Switch to another tab or show placeholder
+  if (currentFile === key) {
+    const keys = [...openFiles.keys()];
+    if (keys.length > 0) {
+      currentFile = keys[keys.length - 1];
+      renderTabs();
+      showTabContent(currentFile);
+      $('currentFile').textContent = currentFile;
+    } else {
+      currentFile = null;
+      renderTabs();
+      $('cmEditorWrap').style.display = 'none';
+      $('editor').style.display = 'none';
+      $('iframeContainer').style.display = 'none';
+      $('editorPlaceholder').style.display = 'block';
+      $('currentFile').textContent = '';
+    }
+  } else {
+    renderTabs();
+  }
+}
+
+function renderTabs() {
+  const tabs = $('editorTabs');
+  tabs.innerHTML = '';
+  // Only show tab bar if there are special (non-file) tabs alongside the current file
+  const hasSpecialTabs = [...openFiles.values()].some(v => v.type !== 'file');
+  tabs.style.display = (openFiles.size > 1 || hasSpecialTabs) ? 'flex' : 'none';
+  for (const [key, info] of openFiles) {
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (key === currentFile ? ' active' : '');
+    const icons = { file: '', workflow: '\u2B21 ', metadata: '\u25C9 ' };
+    const label = info.type === 'file' ? key.split('/').pop() : (info.title || key);
+    tab.innerHTML = `<span class="tab-icon">${icons[info.type] || ''}</span><span>${escapeHtml(label)}</span><span class="tab-close" onclick="closeTab('${key.replace(/'/g, "\\'")}', event)">&times;</span>`;
+    tab.onclick = () => { currentFile = key; renderTabs(); showTabContent(key); };
+    tabs.appendChild(tab);
+  }
+}
+
+/** Show content for the active tab (file editor or iframe) */
+function showTabContent(key) {
+  const info = openFiles.get(key);
+  if (!info) return;
+  $('editorPlaceholder').style.display = 'none';
+  $('codePreview').style.display = 'none';
+  $('mdPreview').style.display = 'none';
+
+  if (info.type === 'file') {
+    $('iframeContainer').style.display = 'none';
+    // Try CodeMirror, fall back to textarea
+    initCodeMirror();
+    if (cmEditor) {
+      $('editor').style.display = 'none';
+      $('cmEditorWrap').style.display = 'block';
+      cmEditor.setValue(info.content || '');
+      cmEditor.setOption('mode', getCmMode(key));
+      cmEditor.clearHistory();
+      setTimeout(() => cmEditor.refresh(), 10);
+    } else {
+      // Textarea fallback
+      $('cmEditorWrap').style.display = 'none';
+      $('editor').style.display = 'block';
+      $('editor').value = info.content || '';
+    }
+    $('currentFile').textContent = key;
+  } else {
+    // Show iframe, hide code editor
+    $('editor').style.display = 'none';
+    $('cmEditorWrap').style.display = 'none';
+    $('iframeContainer').style.display = 'block';
+    // Hide all iframes, show the one for this tab
+    const container = $('iframeContainer');
+    [...container.children].forEach(f => f.style.display = 'none');
+    let iframe = container.querySelector(`iframe[data-tab="${key}"]`);
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.dataset.tab = key;
+      iframe.sandbox = 'allow-scripts allow-same-origin';
+      if (info.type === 'workflow') iframe.src = '/workflow-editor.html';
+      else if (info.type === 'metadata') iframe.src = '/metadata-viewer.html';
+      iframe.onload = () => {
+        // Send data to iframe once ready
+        if (info.data) {
+          const msg = info.type === 'workflow'
+            ? { type: 'loadWorkflow', data: info.data }
+            : { type: 'loadMetadata', data: info.data };
+          iframe.contentWindow.postMessage(msg, '*');
+        }
+      };
+      container.appendChild(iframe);
+    }
+    iframe.style.display = 'block';
+  }
+}
+
+// Legacy alias
+function showEditor(content) {
+  initCodeMirror();
+  $('iframeContainer').style.display = 'none';
+  $('editorPlaceholder').style.display = 'none';
+  if (cmEditor) {
+    $('cmEditorWrap').style.display = 'block';
+    $('editor').style.display = 'none';
+    cmEditor.setValue(content || '');
+    setTimeout(() => cmEditor.refresh(), 10);
+  } else {
+    $('cmEditorWrap').style.display = 'none';
+    $('editor').style.display = 'block';
+    $('editor').value = content || '';
+  }
+}
+
+$('editor').addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault();
+    saveCurrentFile();
+  }
+});
+
+async function saveCurrentFile() {
+  if (!currentFile) return;
+  const info = openFiles.get(currentFile);
+  if (!info || info.type !== 'file') return; // Only save file tabs
+  const content = cmEditor ? cmEditor.getValue() : $('editor').value;
+  info.content = content;
+  await fetch('/api/file', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ path: currentFile, content }) });
+  setStatus('Saved ' + currentFile.split('/').pop(), 'green');
+}
+
+// ===================== CHAT =====================
+async function sendMessage() {
+  const input = $('chatInput');
+  const msg = input.value.trim();
+  if (!msg && !pendingImages.length) return;
+  input.value = '';
+  $('chatSend').disabled = true;
+  setStatus('Thinking...', 'yellow');
+  $('mentionDropdown').classList.remove('open');
+
+  // Show user message with image previews
+  addMsg('user', msg, pendingImages.map(i => i.preview));
+  activeToolGroup = null;
+
+  // Build request body
+  const body = { message: msg };
+  if (pendingImages.length) {
+    body.images = pendingImages.map(i => ({ data: i.data, mediaType: i.mediaType }));
+  }
+  if (pendingMentions.length) {
+    body.mentions = [...pendingMentions];
+  }
+
+  // Clear attachments
+  pendingImages = [];
+  pendingMentions = [];
+  $('chatAttachments').innerHTML = '';
+
+  try {
+    const res = await fetch('/api/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantEl = null;
+    let buffer = '';
+    let currentEvent = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream:true});
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7);
+          continue;
+        }
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            // Thinking indicator
+            if (currentEvent === 'thinking') {
+              if (data.phase === 'start') {
+                addThinkingIndicator();
+                setStatus('Thinking deeply...', 'yellow');
+              } else if (data.phase === 'delta' && data.text) {
+                appendThinkingText(data.text);
+              } else if (data.phase === 'end') {
+                finalizeThinking();
+              }
+            }
+            // Retry indicator
+            else if (currentEvent === 'retry') {
+              addRetryIndicator(data.attempt, data.delay, data.status);
+              setStatus(`Retrying (${data.attempt}/3)...`, 'yellow');
+            }
+            // Text token
+            else if (data.text) {
+              if (!assistantEl) {
+                assistantEl = addMsg('assistant', '');
+                assistantEl.querySelector('.content-text').dataset.raw = '';
+              }
+              const textEl = assistantEl.querySelector('.content-text');
+              textEl.dataset.raw = (textEl.dataset.raw || '') + data.text;
+              textEl.textContent += data.text;
+              scrollChat();
+            }
+            // Tool call - compact indicator
+            else if (data.name && data.input !== undefined) {
+              addToolIndicator(data.name, data.input, 'running', data.detail);
+              setStatus(`${data.name}...`, 'yellow');
+            }
+            // Tool result - update indicator
+            else if (data.name && data.preview !== undefined) {
+              updateToolIndicator(data.name, data.preview);
+              // Auto-activate preview when VLParse returns preview URLs
+              if (data.name === 'VLParse' && data.preview.includes('Preview URLs')) {
+                loadPreviewUrlsFromProfile();
+              }
+            }
+            // AskUserQuestion widget
+            else if (currentEvent === 'ask_user') {
+              showAskUserWidget(data);
+              setStatus('Waiting for your answer...', 'yellow');
+            }
+            // Todos
+            else if (data.todos) {
+              renderTodos(data.todos);
+            }
+            // Done — finalize markdown rendering
+            else if (currentEvent === 'done') {
+              finalizeAssistantMsg(assistantEl);
+              activeToolGroup = null;
+              finalizeAllToolSpinners();
+            }
+            // Error
+            else if (data.message && currentEvent === 'error') {
+              if (!assistantEl) assistantEl = addMsg('assistant', '');
+              assistantEl.querySelector('.content-text').textContent += '\nError: ' + data.message;
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch(e) {
+    addMsg('assistant', 'Connection error: ' + e.message);
+  }
+
+  $('chatSend').disabled = false;
+  setStatus('Ready', 'green');
+  updateContext();
+}
+
+function addMsg(role, text, imagePreviews) {
+  const container = $('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const content = role === 'assistant' ? renderMarkdown(text) : escapeHtml(text);
+  let html = `<div class="label">${role}</div><span class="content-text">${content}</span>`;
+  // Show image thumbnails in user messages
+  if (imagePreviews?.length) {
+    html += '<div class="msg-images">';
+    for (const src of imagePreviews) html += `<img src="${src}" onclick="window.open(this.src)">`;
+    html += '</div>';
+  }
+  div.innerHTML = html;
+  container.appendChild(div);
+  scrollChat();
+  return div;
+}
+
+/** Finalize assistant message: re-render as markdown + add Apply buttons to code blocks */
+function finalizeAssistantMsg(el) {
+  if (!el) return;
+  const textEl = el.querySelector('.content-text');
+  if (textEl) {
+    const raw = textEl.dataset.raw || textEl.textContent;
+    textEl.innerHTML = renderMarkdown(raw);
+    // Add Apply buttons to code blocks
+    textEl.querySelectorAll('pre').forEach(pre => {
+      const btn = document.createElement('button');
+      btn.className = 'code-apply';
+      btn.textContent = 'Apply';
+      btn.onclick = () => applyCodeBlock(pre);
+      pre.style.position = 'relative';
+      pre.appendChild(btn);
+    });
+  }
+}
+
+/** Apply a code block to the current file */
+async function applyCodeBlock(preEl) {
+  if (!currentFile) { setStatus('No file open to apply to', 'red'); return; }
+  const code = preEl.querySelector('code')?.textContent || preEl.textContent;
+  const editorContent = cmEditor ? cmEditor.getValue() : $('editor').value;
+
+  // Show inline diff
+  showInlineDiff(currentFile, editorContent, code, () => {
+    // Accept: write to file
+    if (cmEditor) cmEditor.setValue(code);
+    else $('editor').value = code;
+    const info = openFiles.get(currentFile);
+    if (info && info.type === 'file') info.content = code;
+    else openFiles.set(currentFile, { type: 'file', content: code });
+    saveCurrentFile();
+    setStatus('Applied to ' + currentFile.split('/').pop(), 'green');
+  });
+}
+
+/** Show inline diff block in chat */
+function showInlineDiff(filePath, oldText, newText, onAccept) {
+  const container = $('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'diff-block';
+
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+  let diffHtml = '';
+
+  // Simple line-by-line diff
+  const maxLen = Math.max(oldLines.length, newLines.length);
+  for (let i = 0; i < maxLen; i++) {
+    const ol = oldLines[i], nl = newLines[i];
+    if (ol === nl) {
+      if (ol !== undefined) diffHtml += `<div class="diff-line diff-ctx">${escapeHtml(ol)}</div>`;
+    } else {
+      if (ol !== undefined) diffHtml += `<div class="diff-line diff-del">${escapeHtml(ol)}</div>`;
+      if (nl !== undefined) diffHtml += `<div class="diff-line diff-add">${escapeHtml(nl)}</div>`;
+    }
+  }
+
+  div.innerHTML = `
+    <div class="diff-header">
+      <span class="diff-file">${escapeHtml(filePath)}</span>
+      <div class="diff-actions">
+        <button class="diff-accept" id="diffAccept">Accept</button>
+        <button class="diff-reject" id="diffReject">Reject</button>
+      </div>
+    </div>
+    <div class="diff-body">${diffHtml}</div>`;
+
+  container.appendChild(div);
+  scrollChat();
+
+  div.querySelector('.diff-accept').onclick = () => { onAccept(); div.remove(); };
+  div.querySelector('.diff-reject').onclick = () => { div.remove(); setStatus('Changes rejected', 'yellow'); };
+}
+
+// Claude Code-style compact tool indicator
+let _generatedFileCount = 0;
+let _subAgentCount = 0;
+
+// Tool name → icon mapping
+const TOOL_ICONS = {
+  Read: '&#128196;', ReadFile: '&#128196;', Glob: '&#128269;', Grep: '&#128270;',
+  Edit: '&#9998;', EditFile: '&#9998;', Write: '&#128221;', WriteFile: '&#128221;',
+  Bash: '&#9654;', VLParse: '&#9881;', VLValidate: '&#10003;', VLImpact: '&#9889;',
+  VLMetadata: '&#128202;', VLSection: '&#9638;', SubAgent: '&#9881;', Agent: '&#9881;',
+};
+function getToolIcon(name) { return TOOL_ICONS[name] || '&#9654;'; }
+
+function addToolIndicator(name, desc, status, detail) {
+  const container = $('chatMessages');
+  const descStr = typeof desc === 'string' ? desc : JSON.stringify(desc).substring(0, 80);
+
+  // For WriteFile: group all writes into a single summary
+  if (name === 'WriteFile') {
+    _generatedFileCount++;
+    let summary = container.querySelector('.tool-files-summary');
+    if (!summary) {
+      summary = document.createElement('div');
+      summary.className = 'tool-group tool-files-summary';
+      summary.innerHTML = `
+        <div class="tool-header" onclick="toggleToolBody(this)">
+          <div class="tool-spinner"></div>
+          <span class="tool-name">WriteFile</span>
+          <span class="tool-desc file-count-desc">Writing files... (${_generatedFileCount})</span>
+          <span class="tool-toggle">&#9654;</span>
+        </div>
+        <div class="tool-body file-list-body" style="display:block;padding:4px 8px;"></div>`;
+      container.appendChild(summary);
+    }
+    summary.querySelector('.file-count-desc').textContent = `Writing files... (${_generatedFileCount})`;
+    const entry = document.createElement('div');
+    entry.style.cssText = 'color:var(--green);font-size:10px;padding:1px 0;';
+    entry.textContent = `+ ${descStr}`;
+    summary.querySelector('.file-list-body').appendChild(entry);
+    activeToolGroup = summary;
+    scrollChat();
+    return;
+  }
+
+  // For SubAgent: group into a progress list showing parallel status
+  if (name === 'SubAgent') {
+    _subAgentCount++;
+    let agentSummary = container.querySelector('.tool-agents-summary');
+    if (!agentSummary) {
+      agentSummary = document.createElement('div');
+      agentSummary.className = 'tool-group tool-agents-summary';
+      agentSummary.innerHTML = `
+        <div class="tool-header" onclick="toggleToolBody(this)">
+          <div class="tool-spinner"></div>
+          <span class="tool-name">Parallel Agents</span>
+          <span class="tool-desc agent-count-desc">Running ${_subAgentCount} agent(s) in parallel...</span>
+          <span class="tool-toggle">&#9654;</span>
+        </div>
+        <div class="tool-body agent-list-body" style="display:block;padding:4px 8px;"></div>`;
+      container.appendChild(agentSummary);
+    }
+    const runningCount = agentSummary.querySelectorAll('.agent-step:not([data-done])').length + 1;
+    agentSummary.querySelector('.agent-count-desc').textContent = `Running ${runningCount} agent(s) in parallel...`;
+    const entry = document.createElement('div');
+    entry.className = 'agent-step';
+    entry.dataset.idx = _subAgentCount;
+    entry.dataset.startTime = Date.now();
+    // Extract meaningful label from prompt
+    const label = descStr.replace(/^["{}]*(prompt|explore|general)["{}:\s]*/i, '').substring(0, 60);
+    entry.innerHTML = `<span class="agent-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--yellow);margin-right:6px;animation:pulse 1s ease-in-out infinite;"></span><span style="font-size:10px;">${escapeHtml(label)}...</span><span class="agent-timer" style="margin-left:auto;font-size:9px;color:var(--text2);"></span>`;
+    agentSummary.querySelector('.agent-list-body').appendChild(entry);
+    activeToolGroup = agentSummary;
+    scrollChat();
+    // Update timer
+    const timerId = setInterval(() => {
+      if (entry.dataset.done) { clearInterval(timerId); return; }
+      const elapsed = ((Date.now() - parseInt(entry.dataset.startTime)) / 1000).toFixed(0);
+      const timer = entry.querySelector('.agent-timer');
+      if (timer) timer.textContent = elapsed + 's';
+    }, 1000);
+    return;
+  }
+
+  const group = document.createElement('div');
+  group.className = 'tool-group';
+  group.dataset.toolName = name;
+  group.dataset.startTime = Date.now();
+
+  // Build detail body based on structured detail from server
+  let detailHtml = '';
+  if (detail) {
+    if (detail.type === 'edit' && detail.preview?.length) {
+      detailHtml = detail.preview.map(e =>
+        `<div class="tool-diff"><div class="td-old">- ${escapeHtml(e.old)}</div><div class="td-new">+ ${escapeHtml(e.new)}</div></div>`
+      ).join('') + (detail.editCount > 2 ? `<div class="tool-detail"><span class="td-label">total:</span> <span class="td-val">${detail.editCount} edits</span></div>` : '');
+    } else if (detail.type === 'grep') {
+      detailHtml = `<div class="tool-detail"><span class="td-label">pattern:</span> <span class="td-val">${escapeHtml(detail.pattern)}</span></div>` +
+                   `<div class="tool-detail"><span class="td-label">path:</span> <span class="td-val">${escapeHtml(detail.path)}</span></div>`;
+    } else if (detail.type === 'vlparse') {
+      detailHtml = `<div class="tool-detail"><span class="td-label">action:</span> <span class="td-val">${escapeHtml(detail.action || 'parse')}</span></div>` +
+                   `<div class="tool-detail"><span class="td-label">cookie:</span> <span class="td-val">${detail.cookie}</span></div>`;
+    } else if (detail.type === 'write') {
+      detailHtml = `<div class="tool-detail"><span class="td-label">lines:</span> <span class="td-val">${detail.lines}</span></div>`;
+    } else if (detail.type === 'vledit') {
+      detailHtml = `<div class="tool-detail"><span class="td-label">edits:</span> <span class="td-val">${detail.editCount} change(s)</span></div>`;
+    } else if (detail.type === 'read') {
+      detailHtml = `<div class="tool-detail"><span class="td-label">lines:</span> <span class="td-val">${detail.lines || '?'}</span></div>`;
+    } else if (detail.type === 'other' && detail.raw) {
+      detailHtml = `<div class="tool-detail" style="opacity:0.6">${escapeHtml(detail.raw)}</div>`;
+    }
+  }
+
+  const icon = getToolIcon(name);
+  group.innerHTML = `
+    <div class="tool-header" onclick="toggleToolBody(this)">
+      <div class="tool-spinner"></div>
+      <span class="tool-icon">${icon}</span>
+      <span class="tool-name">${escapeHtml(name)}</span>
+      <span class="tool-desc">${escapeHtml(descStr)}</span>
+      <span class="tool-time"></span>
+      <span class="tool-toggle">&#9654;</span>
+    </div>
+    <div class="tool-body${detailHtml ? ' open' : ''}">${detailHtml}</div>`;
+
+  // Auto-open toggle if detail present
+  if (detailHtml) {
+    const toggle = group.querySelector('.tool-toggle');
+    if (toggle) toggle.classList.add('open');
+  }
+
+  // Start elapsed timer
+  const _timerEl = group.querySelector('.tool-time');
+  const _timerStart = Date.now();
+  group._timerId = setInterval(() => {
+    const elapsed = ((Date.now() - _timerStart) / 1000).toFixed(1);
+    if (_timerEl) _timerEl.textContent = elapsed + 's';
+  }, 200);
+
+  container.appendChild(group);
+  activeToolGroup = group;
+  scrollChat();
+}
+
+function updateToolIndicator(name, result) {
+  // For WriteFile: update the summary group's count label
+  if (name === 'WriteFile') {
+    const summary = document.querySelector('.tool-files-summary');
+    if (summary) {
+      summary.querySelector('.file-count-desc').textContent = `${_generatedFileCount} files written`;
+    }
+    return;
+  }
+
+  // For SubAgent: mark the latest unfinished step as done
+  if (name === 'SubAgent') {
+    const agentSummary = document.querySelector('.tool-agents-summary');
+    if (agentSummary) {
+      const steps = agentSummary.querySelectorAll('.agent-step');
+      // Find first step that hasn't been marked done
+      for (let i = 0; i < steps.length; i++) {
+        if (!steps[i].dataset.done) {
+          steps[i].dataset.done = '1';
+          const dot = steps[i].querySelector('.agent-dot');
+          if (dot) { dot.style.background = 'var(--green)'; dot.style.animation = 'none'; }
+          // Show elapsed time
+          const startTime = parseInt(steps[i].dataset.startTime || 0);
+          if (startTime) {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            const timer = steps[i].querySelector('.agent-timer');
+            if (timer) timer.textContent = elapsed + 's';
+          }
+          break;
+        }
+      }
+      // Update header with counts
+      const doneCount = agentSummary.querySelectorAll('.agent-step[data-done]').length;
+      const totalCount = steps.length;
+      const runningCount = totalCount - doneCount;
+      if (runningCount > 0) {
+        agentSummary.querySelector('.agent-count-desc').textContent = `${runningCount} running, ${doneCount}/${totalCount} done`;
+      } else {
+        agentSummary.querySelector('.agent-count-desc').textContent = `All ${totalCount} agents done`;
+        // Finalize spinner
+        const spinner = agentSummary.querySelector('.tool-spinner');
+        if (spinner) {
+          const parent = spinner.parentNode;
+          spinner.remove();
+          const icon = document.createElement('div');
+          icon.className = 'tool-icon';
+          icon.style.color = 'var(--green)';
+          icon.textContent = '\u2713';
+          parent.prepend(icon);
+        }
+      }
+    }
+    return;
+  }
+
+  // Find the most recent tool group matching name
+  const groups = document.querySelectorAll('.tool-group');
+  let target = null;
+  for (let i = groups.length - 1; i >= 0; i--) {
+    if (groups[i].dataset.toolName === name) {
+      target = groups[i]; break;
+    }
+  }
+  if (!target) return;
+
+  // Stop timer
+  if (target._timerId) { clearInterval(target._timerId); target._timerId = null; }
+
+  // Replace spinner with check/x icon
+  const spinner = target.querySelector('.tool-spinner');
+  if (spinner) {
+    spinner.remove();
+    const doneIcon = document.createElement('span');
+    doneIcon.className = 'tool-status-icon done';
+    doneIcon.innerHTML = '&#10003;';
+    target.querySelector('.tool-header').prepend(doneIcon);
+  }
+
+  // Add result badge to header desc
+  const desc = target.querySelector('.tool-desc');
+  if (desc && result) {
+    const shortResult = result.length > 60 ? result.substring(0, 60) + '...' : result;
+    if (name === 'ReadFile') {
+      desc.innerHTML = escapeHtml(desc.textContent) + `<span class="tool-result-badge ok">${escapeHtml(result)}</span>`;
+    } else if (name === 'VLValidate' && (result.includes('valid') || result.includes('pass'))) {
+      desc.innerHTML = escapeHtml(desc.textContent) + `<span class="tool-result-badge ok">passed</span>`;
+    }
+  }
+
+  // Set body content (preserve existing detail if result is short)
+  const body = target.querySelector('.tool-body');
+  if (result && result.length > 30) {
+    body.textContent = result;
+  } else if (result) {
+    // Short result — append to existing detail
+    const badge = document.createElement('div');
+    badge.className = 'tool-detail';
+    badge.innerHTML = `<span class="td-val" style="color:var(--green)">${escapeHtml(result)}</span>`;
+    body.appendChild(badge);
+  }
+}
+
+/** Finalize ALL tool spinners — called when chat response completes */
+function finalizeAllToolSpinners() {
+  // Finalize WriteFile summary
+  const wfSummary = document.querySelector('.tool-files-summary');
+  if (wfSummary) {
+    const desc = wfSummary.querySelector('.file-count-desc');
+    if (desc) desc.textContent = `${_generatedFileCount} files written`;
+  }
+  _generatedFileCount = 0;
+
+  // Finalize SubAgent summary
+  const agentSummary = document.querySelector('.tool-agents-summary');
+  if (agentSummary) {
+    const desc = agentSummary.querySelector('.agent-count-desc');
+    if (desc) desc.textContent = `${_subAgentCount} agents completed`;
+    // Mark all steps as done
+    agentSummary.querySelectorAll('.agent-step:not([data-done])').forEach(step => {
+      step.dataset.done = '1';
+      const marker = step.querySelector('span');
+      if (marker) { marker.textContent = '\u25CF'; marker.style.color = 'var(--green)'; }
+    });
+  }
+  _subAgentCount = 0;
+
+  // Finalize ALL remaining spinning tool groups — stop timers, replace spinners
+  document.querySelectorAll('.tool-group').forEach(group => {
+    if (group._timerId) { clearInterval(group._timerId); group._timerId = null; }
+  });
+  document.querySelectorAll('.tool-group .tool-spinner').forEach(spinner => {
+    const header = spinner.closest('.tool-header');
+    spinner.remove();
+    const icon = document.createElement('span');
+    icon.className = 'tool-status-icon done';
+    icon.innerHTML = '&#10003;';
+    header?.prepend(icon);
+  });
+}
+
+function toggleToolBody(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.tool-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function renderTodos(todos) {
+  // Remove existing
+  document.querySelectorAll('.msg.todo-list').forEach(e => e.remove());
+  if (!todos || todos.length === 0) return;
+
+  const div = document.createElement('div');
+  div.className = 'msg todo-list';
+  let html = '<div class="label">Tasks</div>';
+  for (const t of todos) {
+    const cls = t.status === 'completed' ? 'todo-done' : t.status === 'in_progress' ? 'todo-active' : 'todo-pending';
+    const icon = t.status === 'completed' ? '\u2713' : t.status === 'in_progress' ? '\u25B6' : '\u25CB';
+    const text = t.status === 'in_progress' ? t.activeForm : t.content;
+    html += `<div class="todo-item ${cls}"><span class="todo-icon">${icon}</span>${escapeHtml(text)}</div>`;
+  }
+  div.innerHTML = html;
+  $('chatMessages').appendChild(div);
+  scrollChat();
+}
+
+let _chatUserScrolled = false;
+function scrollChat() {
+  const el = $('chatMessages');
+  // Only auto-scroll if user hasn't manually scrolled up
+  if (!_chatUserScrolled) {
+    el.scrollTop = el.scrollHeight;
+  }
+}
+// Detect manual scroll: if user scrolls up, stop auto-scroll; if near bottom, resume
+(function() {
+  let _scrollTimer;
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = $('chatMessages');
+    if (!el) return;
+    el.addEventListener('scroll', () => {
+      clearTimeout(_scrollTimer);
+      _scrollTimer = setTimeout(() => {
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+        _chatUserScrolled = !atBottom;
+      }, 50);
+    });
+  });
+})();
+
+// chatInput keydown is handled in @-mention section above
+
+// ===================== GENERATE =====================
+function openGenerate() { $('genModal').classList.add('open'); }
+function closeGenerate() { $('genModal').classList.remove('open'); }
+
+/** Focus chat input with generate hint (new approach — no modal) */
+function focusGenerate() {
+  const input = $('chatInput');
+  const wfName = workflowBindings.generate || '3-file-codegen';
+  input.value = `Generate a VL project (workflow: ${wfName}): `;
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+async function startGenerate() {
+  const req = $('genInput').value.trim();
+  if (!req) return;
+  $('genStart').disabled = true;
+  $('genProgress').style.display = 'block';
+  $('genProgress').innerHTML = '';
+  setStatus('Generating...', 'yellow');
+
+  try {
+    const res = await fetch('/api/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ userRequest: req, targetLang: 'en' })
+    });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.title) addGenStep('step', data.title);
+            if (data.path) addGenStep('file', data.path);
+            if (data.filesWritten) { addGenStep('done', `${data.filesWritten.length} files generated`); await loadFileTree(); }
+            if (data.message) addGenStep('error', data.message);
+          } catch {}
+        }
+      }
+    }
+  } catch(e) { addGenStep('error', e.message); }
+
+  $('genStart').disabled = false;
+  setStatus('Ready', 'green');
+}
+
+function addGenStep(type, text) {
+  const div = document.createElement('div');
+  div.className = 'gen-step';
+  const icon = {error:'\u2717', done:'\u2713', file:'\u25A0', step:'\u25B8'}[type] || '\u25B8';
+  const color = type === 'error' ? 'var(--red)' : type === 'done' ? 'var(--green)' : 'var(--text2)';
+  div.innerHTML = `<span style="color:${color}">${icon}</span> ${escapeHtml(text)}`;
+  $('genProgress').appendChild(div);
+}
+
+// ===================== UTILITIES =====================
+async function api(url) { return (await fetch(url)).json(); }
+
+async function updateContext() {
+  try {
+    const ctx = await api('/api/context');
+    const pct = Math.round(ctx.usedTokens / ctx.maxTokens * 100);
+    $('ctxLabel').textContent = `${pct}%`;
+    $('ctxBar').style.width = pct + '%';
+    $('ctxBar').style.background = pct > 85 ? 'var(--red)' : pct > 60 ? 'var(--yellow)' : 'var(--green)';
+    // Token detail tooltip
+    let detail = `Context: ${(ctx.usedTokens/1000).toFixed(1)}K / ${(ctx.maxTokens/1000).toFixed(0)}K`;
+    detail += `\nMessages: ${ctx.messageCount} (${ctx.turnCount} turns)`;
+    if (ctx.inputTokens !== undefined) {
+      detail += `\nInput: ${(ctx.inputTokens/1000).toFixed(1)}K tokens`;
+      detail += `\nOutput: ${(ctx.outputTokens/1000).toFixed(1)}K tokens`;
+      if (ctx.cacheRead) detail += `\nCache hit: ${(ctx.cacheRead/1000).toFixed(1)}K`;
+      detail += `\nTotal: ${(ctx.totalInputTokens/1000).toFixed(1)}K in / ${(ctx.totalOutputTokens/1000).toFixed(1)}K out`;
+    }
+    $('ctxDetail').textContent = detail;
+  } catch {}
+}
+
+function setStatus(text, color) {
+  $('statusText').textContent = text;
+  const dot = document.querySelector('.bottom-bar .dot');
+  if (dot) dot.className = 'dot dot-' + color;
+}
+
+let _sseSource = null;
+function connectSSE() {
+  if (_sseSource) { try { _sseSource.close(); } catch {} }
+  const es = new EventSource('/api/events');
+  _sseSource = es;
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'file_changed') {
+        setStatus(`Changed: ${data.path}`, 'yellow');
+        setTimeout(() => setStatus('Ready', 'green'), 2000);
+      }
+      if (data.type === 'validation_result') {
+        setStatus(data.result?.substring(0, 60) || 'Validated', data.result?.includes('Error') ? 'red' : 'green');
+      }
+      if (data.type === 'project_reloaded') {
+        loadFileTree();
+        loadProjectInfo();
+      }
+      if (data.type === 'settings_changed') {
+        loadProjectInfo();
+      }
+      if (data.type === 'server_restart') {
+        setStatus('Server restarting...', 'yellow');
+        // Wait for server to come back, then reload
+        setTimeout(() => waitForServerAndReload(), data.delay || 2000);
+      }
+    } catch {}
+  };
+  // Auto-reconnect on disconnect
+  es.onerror = () => {
+    es.close();
+    _sseSource = null;
+    setStatus('Disconnected — reconnecting...', 'red');
+    setTimeout(() => {
+      fetch('/api/version').then(r => r.json()).then(() => {
+        setStatus('Reconnected', 'green');
+        connectSSE();
+        loadProjectInfo();
+        loadFileTree();
+      }).catch(() => setTimeout(connectSSE, 3000));
+    }, 2000);
+  };
+}
+
+/** Wait for server to come back after restart, then soft-reload */
+function waitForServerAndReload() {
+  let attempts = 0;
+  const check = () => {
+    fetch('/api/version').then(r => r.json()).then(data => {
+      setStatus(`Server v${data.version} ready`, 'green');
+      // Soft reload: reconnect SSE, reload data, keep UI state
+      connectSSE();
+      loadProjectInfo();
+      loadFileTree();
+      loadWorkspaces();
+      updateContext();
+    }).catch(() => {
+      if (++attempts < 20) setTimeout(check, 1000);
+      else setStatus('Server not responding — please reload page', 'red');
+    });
+  };
+  setTimeout(check, 1000);
+}
+
+/** Show the update button in header */
+function showUpdateButton() {
+  const btn = $('updateBtn');
+  if (btn) btn.style.display = '';
+}
+
+/** Restart server from UI — saves chat state first */
+async function restartServer() {
+  saveChatState(); // Persist chat before restart
+  setStatus('Restarting server...', 'yellow');
+  $('updateBtn').style.display = 'none';
+  try { await fetch('/api/restart', { method: 'POST' }); } catch {}
+  waitForServerAndReload();
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/** Simple markdown → HTML renderer */
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = escapeHtml(text);
+
+  // Code blocks (``` ... ```)
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre><code class="lang-${lang}">${code.trim()}</code></pre>`);
+
+  // Inline code
+  html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+
+  // Headers
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Bold + italic
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // Blockquote
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+  // Unordered list
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+
+  // Ordered list
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+  // Links (markdown format)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // Auto-link bare URLs (not already inside href or tag)
+  html = html.replace(/(^|[^"=>])(https?:\/\/[^\s<)"']+)/g, '$1<a href="$2" target="_blank">$2</a>');
+
+  // Paragraphs (double newline)
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = `<p>${html}</p>`;
+  html = html.replace(/<p><(h[123]|pre|ul|ol|blockquote)/g, '<$1');
+  html = html.replace(/<\/(h[123]|pre|ul|ol|blockquote)><\/p>/g, '</$1>');
+
+  // Single newlines → <br> (but not inside pre)
+  html = html.replace(/<p>([\s\S]*?)<\/p>/g, (_, inner) =>
+    `<p>${inner.replace(/\n/g, '<br>')}</p>`);
+
+  return html;
+}
+
+// ===================== IMAGE UPLOAD =====================
+function setupImagePaste() {
+  // Paste images from clipboard
+  document.addEventListener('paste', e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        addImageAttachment(file);
+      }
+    }
+  });
+
+  // File input change
+  $('imageInput').addEventListener('change', e => {
+    for (const file of e.target.files) addImageAttachment(file);
+    e.target.value = '';
+  });
+
+  // Drag image onto chat input area
+  const inputArea = document.querySelector('.chat-input-area');
+  inputArea.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  inputArea.addEventListener('drop', e => {
+    e.preventDefault();
+    for (const file of e.dataTransfer.files) {
+      if (file.type.startsWith('image/')) addImageAttachment(file);
+    }
+  });
+}
+
+function addImageAttachment(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result;
+    const base64 = dataUrl.split(',')[1];
+    const mediaType = file.type;
+    pendingImages.push({ data: base64, mediaType, preview: dataUrl });
+    renderAttachments();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderAttachments() {
+  const container = $('chatAttachments');
+  container.innerHTML = '';
+  for (let i = 0; i < pendingImages.length; i++) {
+    const div = document.createElement('div');
+    div.className = 'chat-attach-item';
+    div.innerHTML = `<img src="${pendingImages[i].preview}"><span class="remove" onclick="removeImage(${i})">&times;</span>`;
+    container.appendChild(div);
+  }
+  for (let i = 0; i < pendingMentions.length; i++) {
+    const div = document.createElement('div');
+    div.className = 'chat-attach-item';
+    div.innerHTML = `@${escapeHtml(pendingMentions[i])}<span class="remove" onclick="removeMention(${i})">&times;</span>`;
+    container.appendChild(div);
+  }
+}
+
+function removeImage(idx) { pendingImages.splice(idx, 1); renderAttachments(); }
+function removeMention(idx) { pendingMentions.splice(idx, 1); renderAttachments(); }
+
+// ===================== @-MENTION AUTOCOMPLETE =====================
+$('chatInput').addEventListener('input', async function(e) {
+  const val = this.value;
+  const atIdx = val.lastIndexOf('@');
+  if (atIdx === -1 || atIdx < val.lastIndexOf(' ', this.selectionStart - 1)) {
+    $('mentionDropdown').classList.remove('open');
+    return;
+  }
+  const query = val.slice(atIdx + 1, this.selectionStart).toLowerCase();
+  if (query.length === 0 && val[atIdx - 1] && val[atIdx - 1] !== ' ') {
+    $('mentionDropdown').classList.remove('open');
+    return;
+  }
+
+  // Fetch matching files
+  try {
+    const files = await api(`/api/files/autocomplete?q=${encodeURIComponent(query)}`);
+    if (files.length === 0) { $('mentionDropdown').classList.remove('open'); return; }
+    const dd = $('mentionDropdown');
+    dd.innerHTML = '';
+    mentionIdx = -1;
+    for (const f of files) {
+      const item = document.createElement('div');
+      item.className = 'mention-item';
+      const typeClass = 'type-' + getType(f.name);
+      item.innerHTML = `<span class="m-type ${typeClass}">${f.type || getType(f.name)}</span>${escapeHtml(f.name)}`;
+      item.onclick = () => selectMention(f.name, atIdx);
+      dd.appendChild(item);
+    }
+    dd.classList.add('open');
+  } catch {}
+});
+
+$('chatInput').addEventListener('keydown', function(e) {
+  const dd = $('mentionDropdown');
+  if (!dd.classList.contains('open')) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    return;
+  }
+  const items = dd.querySelectorAll('.mention-item');
+  if (e.key === 'ArrowDown') { e.preventDefault(); mentionIdx = Math.min(mentionIdx + 1, items.length - 1); highlightMention(items); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); mentionIdx = Math.max(mentionIdx - 1, 0); highlightMention(items); }
+  else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    if (mentionIdx >= 0 && items[mentionIdx]) {
+      const name = items[mentionIdx].textContent.trim();
+      const atIdx = this.value.lastIndexOf('@');
+      selectMention(name, atIdx);
+    }
+  } else if (e.key === 'Escape') {
+    dd.classList.remove('open');
+  }
+});
+
+function highlightMention(items) {
+  items.forEach((el, i) => el.classList.toggle('selected', i === mentionIdx));
+}
+
+function selectMention(name, atIdx) {
+  const input = $('chatInput');
+  input.value = input.value.slice(0, atIdx) + '@' + name + ' ' + input.value.slice(input.selectionStart);
+  input.focus();
+  $('mentionDropdown').classList.remove('open');
+  if (!pendingMentions.includes(name)) {
+    pendingMentions.push(name);
+    renderAttachments();
+  }
+}
+
+// ===================== CONVERSATION TABS =====================
+function renderConvTabs() {
+  const tabs = $('convTabs');
+  tabs.innerHTML = '';
+  for (const conv of conversations) {
+    const tab = document.createElement('div');
+    tab.className = 'conv-tab' + (conv.id === activeConvId ? ' active' : '');
+    tab.dataset.conv = conv.id;
+    tab.innerHTML = `${escapeHtml(conv.name)}${conversations.length > 1 ? '<span class="conv-close" onclick="event.stopPropagation();closeConversation(' + conv.id + ')">&times;</span>' : ''}`;
+    tab.onclick = () => switchConversation(conv.id);
+    tabs.appendChild(tab);
+  }
+  const addBtn = document.createElement('button');
+  addBtn.className = 'conv-new';
+  addBtn.textContent = '+';
+  addBtn.onclick = newConversation;
+  addBtn.title = 'New conversation';
+  tabs.appendChild(addBtn);
+}
+
+function newConversation() {
+  // Save current chat DOM
+  const curConv = conversations.find(c => c.id === activeConvId);
+  if (curConv) curConv.dom = $('chatMessages').innerHTML;
+
+  const id = convIdCounter++;
+  conversations.push({ id, name: `Chat ${id + 1}`, messages: [], dom: '' });
+  activeConvId = id;
+  $('chatMessages').innerHTML = '';
+  renderConvTabs();
+  saveChatState();
+}
+
+function switchConversation(id) {
+  if (id === activeConvId) return;
+  const curConv = conversations.find(c => c.id === activeConvId);
+  if (curConv) curConv.dom = $('chatMessages').innerHTML;
+  activeConvId = id;
+  const target = conversations.find(c => c.id === id);
+  $('chatMessages').innerHTML = target?.dom || '';
+  renderConvTabs();
+  saveChatState();
+}
+
+function closeConversation(id) {
+  if (conversations.length <= 1) return;
+  conversations = conversations.filter(c => c.id !== id);
+  if (activeConvId === id) {
+    activeConvId = conversations[0].id;
+    const target = conversations[0];
+    $('chatMessages').innerHTML = target?.dom || '';
+  }
+  renderConvTabs();
+  saveChatState();
+}
+
+// ===================== THINKING INDICATOR =====================
+let activeThinkingEl = null;
+function addThinkingIndicator() {
+  const container = $('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'thinking-block';
+  div.innerHTML = `
+    <div class="thinking-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      <span class="think-icon">&#x1F4AD;</span> <span>Thinking...</span>
+    </div>
+    <div class="thinking-body"></div>`;
+  container.appendChild(div);
+  activeThinkingEl = div;
+  scrollChat();
+}
+function appendThinkingText(text) {
+  if (!activeThinkingEl) return;
+  activeThinkingEl.querySelector('.thinking-body').textContent += text;
+}
+function finalizeThinking() {
+  if (!activeThinkingEl) return;
+  activeThinkingEl.classList.add('done');
+  const header = activeThinkingEl.querySelector('.thinking-header span:last-child');
+  const body = activeThinkingEl.querySelector('.thinking-body');
+  const chars = body.textContent.length;
+  header.textContent = `Thought for ${chars > 500 ? Math.round(chars / 100) + ' blocks' : chars + ' chars'}`;
+  activeThinkingEl = null;
+}
+
+function addRetryIndicator(attempt, delay, status) {
+  const container = $('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'retry-msg';
+  div.innerHTML = `&#9889; Retry ${attempt}/3 (${status}) — waiting ${(delay / 1000).toFixed(1)}s`;
+  container.appendChild(div);
+  scrollChat();
+}
+
+// ===================== KEYBOARD SHORTCUTS =====================
+document.addEventListener('keydown', e => {
+  // Escape: close any open modal / context menu
+  if (e.key === 'Escape') {
+    $('settingsModal').classList.remove('open');
+    $('genModal').classList.remove('open');
+    $('fileCtxMenu').classList.remove('open');
+  }
+  // Cmd/Ctrl+K: clear chat
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    $('chatMessages').innerHTML = '';
+  }
+  // Cmd/Ctrl+/: focus chat input
+  if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+    e.preventDefault();
+    $('chatInput').focus();
+  }
+});
+
+// ===================== LOAD FOLDER =====================
+async function loadFolder() {
+  if (window.showDirectoryPicker) {
+    try {
+      const dirHandle = await window.showDirectoryPicker();
+      setStatus('Reading folder...', 'yellow');
+      const files = await readDirHandle(dirHandle, '');
+      await uploadFiles(files);
+      return;
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  $('folderInput').click();
+}
+
+$('folderInput').addEventListener('change', async (e) => {
+  if (!e.target.files?.length) return;
+  setStatus('Reading folder...', 'yellow');
+  await uploadFiles(await readFileList(e.target.files));
+  e.target.value = '';
+});
+
+async function readDirHandle(dirHandle, prefix) {
+  const vlExts = ['.vx', '.sc', '.cp', '.vs', '.vdb', '.vth'];
+  const files = [];
+  for await (const entry of dirHandle.values()) {
+    const ep = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.kind === 'directory') files.push(...await readDirHandle(entry, ep));
+    else if (entry.kind === 'file' && vlExts.some(x => entry.name.endsWith(x))) {
+      files.push({ path: ep, content: await (await entry.getFile()).text() });
+    }
+  }
+  return files;
+}
+
+async function readFileList(fileList) {
+  const vlExts = ['.vx', '.sc', '.cp', '.vs', '.vdb', '.vth'];
+  const files = [];
+  for (const file of fileList) {
+    if (!vlExts.some(x => file.name.endsWith(x))) continue;
+    const parts = (file.webkitRelativePath || file.name).split('/');
+    files.push({ path: parts.length > 1 ? parts.slice(1).join('/') : parts[0], content: await file.text() });
+  }
+  return files;
+}
+
+async function uploadFiles(files) {
+  if (!files?.length) { setStatus('No VL files found', 'red'); setTimeout(() => setStatus('Ready', 'green'), 3000); return; }
+  setStatus(`Uploading ${files.length} files...`, 'yellow');
+  try {
+    const res = await fetch('/api/upload-folder', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({files}) });
+    const data = await res.json();
+    if (data.error) { setStatus(data.error, 'red'); setTimeout(() => setStatus('Ready', 'green'), 3000); return; }
+    setStatus(`Loaded ${data.filesWritten} VL files`, 'green');
+    await loadFileTree();
+    await loadProjectInfo();
+    // Auto-open first .vx file in Code tab
+    autoOpenFirstFile();
+  } catch (e) { setStatus('Upload failed', 'red'); setTimeout(() => setStatus('Ready', 'green'), 3000); }
+}
+
+/** Auto-open the first VL file (.vx preferred) after loading a project */
+async function autoOpenFirstFile() {
+  try {
+    const data = await api('/api/files');
+    const priority = ['vx','sc','cp','vs','vdb','vth'];
+    for (const ext of priority) {
+      const found = data.files.find(f => f.endsWith('.' + ext));
+      if (found) { openFile(found); return; }
+    }
+    if (data.files.length > 0) openFile(data.files[0]);
+  } catch {}
+}
+
+// ===================== FILE MANAGEMENT (Delete / Clear / ZIP) =====================
+async function deleteFile(fpath) {
+  if (!fpath) return;
+  try {
+    await fetch(`/api/file?path=${encodeURIComponent(fpath)}`, { method: 'DELETE' });
+    // Close tab if open
+    if (openFiles.has(fpath)) closeTab(fpath);
+    await loadFileTree();
+    setStatus('Deleted ' + fpath.split('/').pop(), 'green');
+  } catch (e) { setStatus('Delete failed', 'red'); }
+}
+
+async function clearAllFiles() {
+  if (!confirm('Delete ALL VL files in this project? This cannot be undone.')) return;
+  try {
+    await fetch('/api/files/clear', { method: 'POST' });
+    openFiles.clear();
+    currentFile = null;
+    renderTabs();
+    $('editor').style.display = 'none';
+    $('iframeContainer').style.display = 'none';
+    $('editorPlaceholder').style.display = 'block';
+    await loadFileTree();
+    await loadProjectInfo();
+    setStatus('All files cleared', 'green');
+  } catch (e) { setStatus('Clear failed', 'red'); }
+}
+
+/** Initialize VL project structure with directories and core files */
+async function initProject() {
+  setStatus('Initializing project...', 'yellow');
+  try {
+    await fetch('/api/project/init', { method: 'POST' });
+    await loadFileTree();
+    await loadProjectInfo();
+    setStatus('Project initialized', 'green');
+  } catch (e) { setStatus('Init failed', 'red'); }
+}
+
+function importZip() { $('zipInput').click(); }
+
+$('zipInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setStatus('Importing ZIP...', 'yellow');
+  try {
+    const formData = new FormData();
+    formData.append('zip', file);
+    // Read as base64 and send as JSON since our server uses JSON
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result.split(',')[1];
+      const res = await fetch('/api/upload-zip', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: base64, filename: file.name })
+      });
+      const data = await res.json();
+      if (data.error) { setStatus(data.error, 'red'); return; }
+      setStatus(`Imported ${data.filesWritten} files from ZIP`, 'green');
+      await loadFileTree();
+      await loadProjectInfo();
+      // Auto-switch to Code tab and open first file
+      autoOpenFirstFile();
+    };
+    reader.readAsDataURL(file);
+  } catch (e) { setStatus('ZIP import failed', 'red'); }
+  e.target.value = '';
+});
+
+// File tree context menu
+function showFileCtxMenu(e, fpath) {
+  e.preventDefault();
+  e.stopPropagation();
+  ctxMenuTarget = fpath;
+  const menu = $('fileCtxMenu');
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  menu.classList.add('open');
+}
+
+function ctxOpenFile() {
+  $('fileCtxMenu').classList.remove('open');
+  if (ctxMenuTarget) openFile(ctxMenuTarget);
+}
+
+function ctxDeleteFile() {
+  $('fileCtxMenu').classList.remove('open');
+  if (ctxMenuTarget && confirm(`Delete ${ctxMenuTarget}?`)) deleteFile(ctxMenuTarget);
+}
+
+// Close context menu on click elsewhere
+document.addEventListener('click', () => $('fileCtxMenu').classList.remove('open'));
+
+// ===================== DRAG-AND-DROP =====================
+let dragCounter = 0;
+document.addEventListener('dragenter', e => { e.preventDefault(); dragCounter++; $('dropOverlay').classList.add('active'); });
+document.addEventListener('dragleave', e => { e.preventDefault(); if (--dragCounter <= 0) { dragCounter = 0; $('dropOverlay').classList.remove('active'); } });
+document.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+document.addEventListener('drop', async (e) => {
+  e.preventDefault(); dragCounter = 0; $('dropOverlay').classList.remove('active');
+  // Check if drop is on chat input area (handled separately for images)
+  if (e.target.closest('.chat-input-area')) return;
+
+  const items = e.dataTransfer.items;
+  const dtFiles = e.dataTransfer.files;
+  if (!items?.length && !dtFiles?.length) return;
+  setStatus('Reading dropped files...', 'yellow');
+
+  // Handle ZIP files dropped directly
+  for (const f of dtFiles) {
+    if (f.name.endsWith('.zip')) {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+        try {
+          const res = await fetch('/api/upload-zip', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: base64, filename: f.name })
+          });
+          const data = await res.json();
+          if (data.error) { setStatus(data.error, 'red'); return; }
+          setStatus(`Imported ${data.filesWritten} files from ZIP`, 'green');
+          await loadFileTree();
+          await loadProjectInfo();
+          autoOpenFirstFile();
+        } catch { setStatus('ZIP import failed', 'red'); }
+      };
+      reader.readAsDataURL(f);
+      return;
+    }
+  }
+
+  const files = [];
+  const vlExts = ['.vx','.sc','.cp','.vs','.vdb','.vth'];
+  const allExts = [...vlExts, '.json'];
+
+  if (items[0]?.getAsFileSystemHandle) {
+    try {
+      for (const item of items) {
+        const handle = await item.getAsFileSystemHandle();
+        if (handle.kind === 'directory') files.push(...await readDirHandle(handle, ''));
+        else if (handle.kind === 'file') {
+          if (allExts.some(x => handle.name.endsWith(x))) {
+            const content = await (await handle.getFile()).text();
+            const dir = handle.name.endsWith('.json') ? 'Process/' : '';
+            files.push({ path: dir + handle.name, content });
+          }
+        }
+      }
+      await uploadFiles(files); return;
+    } catch {}
+  }
+
+  const entries = [...items].map(i => i.webkitGetAsEntry?.()).filter(Boolean);
+  if (entries.length) {
+    async function readEntry(entry, prefix) {
+      return new Promise(resolve => {
+        if (entry.isFile) {
+          if (allExts.some(x => entry.name.endsWith(x))) {
+            entry.file(f => { const r = new FileReader(); r.onload = () => {
+              const dir = entry.name.endsWith('.json') && !prefix ? 'Process/' : '';
+              files.push({ path: dir + (prefix ? `${prefix}/${entry.name}` : entry.name), content: r.result }); resolve();
+            }; r.readAsText(f); });
+          } else resolve();
+        } else if (entry.isDirectory) {
+          const dr = entry.createReader();
+          dr.readEntries(async subs => { const ep = prefix ? `${prefix}/${entry.name}` : entry.name; for (const s of subs) await readEntry(s, ep); resolve(); });
+        } else resolve();
+      });
+    }
+    for (const entry of entries) await readEntry(entry, '');
+    await uploadFiles(files);
+  }
+});
+
+// ===================== ASK USER QUESTION (Interactive Choices) =====================
+function showAskUserWidget(data) {
+  const container = $('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'ask-user-widget';
+
+  const inputType = data.multiSelect ? 'checkbox' : 'radio';
+  let optionsHtml = '';
+  for (let i = 0; i < data.options.length; i++) {
+    const opt = data.options[i];
+    optionsHtml += `<div class="ask-user-option" onclick="toggleAskOption(this, '${inputType}')">
+      <input type="${inputType}" name="ask-opt" value="${i}">
+      <div><div class="opt-label">${escapeHtml(opt.label)}</div>${opt.description ? `<div class="opt-desc">${escapeHtml(opt.description)}</div>` : ''}</div>
+    </div>`;
+  }
+
+  div.innerHTML = `
+    <div class="ask-question">${escapeHtml(data.question)}</div>
+    ${optionsHtml}
+    <div class="ask-user-other"><input type="text" id="askOtherInput" placeholder="Or type your own answer..."></div>
+    <div class="ask-user-submit"><button onclick="submitAskAnswer(this.closest('.ask-user-widget'))">Submit</button></div>`;
+
+  container.appendChild(div);
+  scrollChat();
+}
+
+function toggleAskOption(optEl, type) {
+  if (type === 'radio') {
+    optEl.closest('.ask-user-widget').querySelectorAll('.ask-user-option').forEach(el => el.classList.remove('selected'));
+  }
+  optEl.classList.toggle('selected');
+  optEl.querySelector('input').checked = optEl.classList.contains('selected');
+}
+
+async function submitAskAnswer(widget) {
+  const otherInput = widget.querySelector('#askOtherInput').value.trim();
+  if (otherInput) {
+    await fetch('/api/answer', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ answer: otherInput }) });
+  } else {
+    const selected = [...widget.querySelectorAll('input:checked')].map(inp => {
+      const opt = inp.closest('.ask-user-option').querySelector('.opt-label');
+      return opt ? opt.textContent : '';
+    }).filter(Boolean);
+    const answer = selected.length ? selected.join(', ') : 'No selection';
+    await fetch('/api/answer', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ answer }) });
+  }
+  // Dim the widget after answering
+  widget.style.opacity = '0.5';
+  widget.querySelector('.ask-user-submit button').disabled = true;
+}
+
+// ===================== SKILL PALETTE =====================
+let cachedSkills = null;
+let skillIdx = -1;
+
+// Client-side commands (instant, no LLM)
+const CLIENT_COMMANDS = [
+  { name: 'help', description: 'Show all available commands' },
+  { name: 'clear', description: 'Clear conversation context (fresh start)' },
+  { name: 'context', description: 'Show context window usage' },
+  { name: 'compile', description: 'Compile project and get preview URLs' },
+  { name: 'status', description: 'Show project status summary' },
+  { name: 'docs', description: 'Sync VL reference docs from DocCenter' },
+  { name: 'version', description: 'Show VL-Code version' },
+  { name: 'screenshot', description: 'Take IDE screenshot (self-test via Playwright)' },
+  { name: 'console', description: 'Show browser console logs (errors/warnings)' },
+  { name: 'inspect', description: 'Evaluate JS expression in browser context' },
+  { name: 'test', description: 'List VL component instance-ids in compiled preview' },
+  { name: 'syntax', description: 'Look up VL syntax reference (widget, section, rules)' },
+  { name: 'compile-errors', description: 'Show last compile errors from parsevl' },
+];
+
+function handleClientCommand(name, args) {
+  switch (name) {
+    case 'help': {
+      const cmds = CLIENT_COMMANDS.map(c => `  **/${c.name}** — ${c.description}`).join('\n');
+      const skills = (cachedSkills || []).map(s => `  **/${s.name}** — ${s.description}`).join('\n');
+      addMsg('assistant', `**Available Commands**\n\n_Client commands (instant):_\n${cmds}\n\n_AI skills (LLM-powered):_\n${skills || '  Loading...'}`);
+      return true;
+    }
+    case 'clear':
+      fetch('/api/context/clear', { method: 'POST' });
+      $('chatMessages').innerHTML = '';
+      conversations = [{ id: 0, name: 'Chat 1', messages: [] }];
+      activeConvId = 0; convIdCounter = 1;
+      saveChatState();
+      renderConvTabs();
+      addMsg('assistant', 'Context cleared. Starting fresh conversation.');
+      return true;
+    case 'context':
+      updateContext();
+      api('/api/context').then(ctx => {
+        const pct = Math.round(ctx.usedTokens / ctx.maxTokens * 100);
+        addMsg('assistant', `**Context Usage:** ${(ctx.usedTokens/1000).toFixed(1)}K / ${(ctx.maxTokens/1000).toFixed(0)}K tokens (${pct}%)\nTurns: ${ctx.turnCount || 0}\nCache read: ${(ctx.cacheRead/1000).toFixed(1)}K | Cache write: ${(ctx.cacheCreation/1000).toFixed(1)}K`);
+      });
+      return true;
+    case 'compile':
+      compileProject();
+      return true;
+    case 'status':
+      api('/api/project').then(proj => {
+        const s = proj.summary || {};
+        const files = s.totalFiles || 0;
+        const types = s.filesByType ? Object.entries(s.filesByType).map(([k,v]) => `${k}: ${v}`).join(', ') : 'none';
+        addMsg('assistant', `**Project Status**\nName: ${s.projectName || 'Unknown'}\nDirectory: ${proj.workDir}\nVL Project: ${proj.isVL ? 'Yes' : 'No'}\nFiles: ${files} (${types})\nModel: ${proj.model}\nVersion: v${proj.version}`);
+      });
+      return true;
+    case 'docs':
+      syncVLDocs();
+      return true;
+    case 'version':
+      api('/api/version').then(v => addMsg('assistant', `VL-Code **v${v.version}**`));
+      return true;
+    case 'screenshot': {
+      addMsg('assistant', 'Taking screenshot via Playwright...');
+      fetch('/api/browser/screenshot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: args || 'ide_' + Date.now() }) })
+        .then(r => r.json()).then(data => {
+          if (data.error) addMsg('assistant', 'Screenshot error: ' + data.error);
+          else addMsg('assistant', `Screenshot saved: **${data.path}**\nSize: ${data.size}\n\n_View at: /api/browser/screenshot/${(args || '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'ide_' + Date.now()}_`);
+        }).catch(e => addMsg('assistant', 'Screenshot failed: ' + e.message));
+      return true;
+    }
+    case 'console': {
+      fetch('/api/browser/console', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filter: args || 'error' }) })
+        .then(r => r.json()).then(data => {
+          if (!data.logs?.length) { addMsg('assistant', `No ${args || 'error'} logs found.`); return; }
+          const lines = data.logs.map(l => `[${l.type}] ${l.text}`).join('\n');
+          addMsg('assistant', `**Browser Console** (${data.logs.length}/${data.total}):\n\`\`\`\n${lines}\n\`\`\``);
+        }).catch(e => addMsg('assistant', 'Console fetch failed: ' + e.message));
+      return true;
+    }
+    case 'inspect': {
+      if (!args) { addMsg('assistant', 'Usage: /inspect <js expression>'); return true; }
+      fetch('/api/browser/evaluate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expression: args }) })
+        .then(r => r.json()).then(data => {
+          if (data.error) addMsg('assistant', 'Eval error: ' + data.error);
+          else addMsg('assistant', `**Result:**\n\`\`\`\n${data.result}\n\`\`\``);
+        }).catch(e => addMsg('assistant', 'Inspect failed: ' + e.message));
+      return true;
+    }
+    case 'test': {
+      addMsg('assistant', 'Scanning VL components in compiled preview...');
+      const previewUrl = args || null;
+      const body = previewUrl ? { action: 'open', url: previewUrl } : { action: 'listIds' };
+      // If a URL is provided, open it first then listIds
+      if (previewUrl) {
+        fetch('/api/vl-test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'open', url: previewUrl }) })
+          .then(r => r.json()).then(openRes => {
+            if (openRes.error) { addMsg('assistant', 'Open failed: ' + openRes.error); return; }
+            return fetch('/api/vl-test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'listIds' }) }).then(r => r.json());
+          }).then(data => {
+            if (!data) return;
+            if (data.error) { addMsg('assistant', 'listIds error: ' + data.error); return; }
+            const lines = (data.elements || []).map(e => `  **${e.iid}** — \`<${e.tag}>\` ${e.visible ? '✓' : '✗'} ${e.text ? '"' + e.text.slice(0, 30) + '"' : ''}`).join('\n');
+            addMsg('assistant', `**VL Components** (${data.count} found):\n${lines || '  None found'}`);
+          }).catch(e => addMsg('assistant', 'Test failed: ' + e.message));
+      } else {
+        fetch('/api/vl-test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'listIds' }) })
+          .then(r => r.json()).then(data => {
+            if (data.error) { addMsg('assistant', 'listIds error: ' + data.error + '\n\n_Usage: /test <preview-url> to open a VL preview first_'); return; }
+            const lines = (data.elements || []).map(e => `  **${e.iid}** — \`<${e.tag}>\` ${e.visible ? '✓' : '✗'} ${e.text ? '"' + e.text.slice(0, 30) + '"' : ''}`).join('\n');
+            addMsg('assistant', `**VL Components** (${data.count} found):\n${lines || '  None found'}`);
+          }).catch(e => addMsg('assistant', 'Test failed: ' + e.message));
+      }
+      return true;
+    }
+    case 'compile-errors': {
+      fetch('/api/compile/errors').then(r => r.json()).then(data => {
+        if (!data.errList?.length) {
+          addMsg('assistant', data.message || 'No compile errors. Last compile was clean.');
+          return;
+        }
+        const errLines = data.errList.map((e, i) => {
+          if (typeof e === 'string') return `  ${i + 1}. ${e}`;
+          if (typeof e === 'object') return `  ${i + 1}. **${e.file || e.type || 'Error'}**: ${e.message || e.msg || JSON.stringify(e)}`;
+          return `  ${i + 1}. ${JSON.stringify(e)}`;
+        }).join('\n');
+        addMsg('assistant', `**Last Compile Errors** (${data.errCount}) — ${data.timestamp || 'unknown time'}\nGID: ${data.gid || 'N/A'}\n\n${errLines}\n\n_Ask the AI to debug these errors, or use /debug to auto-analyze._`);
+      }).catch(e => addMsg('assistant', 'Failed to fetch compile errors: ' + e.message));
+      return true;
+    }
+    case 'syntax': {
+      if (!args) { addMsg('assistant', 'Usage:\n  **/syntax rules** — show VL generation hard rules\n  **/syntax widget Button** — look up a widget\n  **/syntax <keyword>** — search the VL reference'); return true; }
+      const parts = args.trim().split(/\s+/);
+      let body;
+      if (parts[0] === 'rules') body = { action: 'rules' };
+      else if (parts[0] === 'widget' && parts[1]) body = { action: 'widget', query: parts.slice(1).join(' ') };
+      else if (parts[0] === 'section' && parts[1]) body = { action: 'section', query: parts.slice(1).join(' ') };
+      else body = { action: 'search', query: args.trim() };
+      addMsg('assistant', `Looking up VL syntax: **${args.trim()}**...`);
+      fetch('/api/vl-syntax', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(r => r.json()).then(data => {
+          if (data.error) { addMsg('assistant', 'Syntax lookup error: ' + data.error + (data.availableSections ? '\n\nAvailable sections: ' + data.availableSections.map(s => s.id).join(', ') : '') + (data.candidates ? '\n\nDid you mean: ' + data.candidates.map(c => c.heading).join(', ') : '')); return; }
+          if (data.content) { addMsg('assistant', `**VL Reference: ${data.title || data.widget || data.section || args}**\n\n\`\`\`vl\n${data.content.slice(0, 3000)}\n\`\`\`${data.content.length > 3000 ? '\n\n_(truncated — use more specific query for full content)_' : ''}`); return; }
+          if (data.results) { const lines = data.results.map(r => `**Line ${r.line}**: ${r.match}`).join('\n'); addMsg('assistant', `**Search: "${data.query}"** (${data.totalMatches} matches)\n\n${lines}`); return; }
+          if (data.availableSections) { addMsg('assistant', `**Available sections:**\n${data.availableSections.map(s => `  - **${s.id}** — ${s.title}`).join('\n')}`); return; }
+          addMsg('assistant', '```json\n' + JSON.stringify(data, null, 2) + '\n```');
+        }).catch(e => addMsg('assistant', 'Syntax lookup failed: ' + e.message));
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+async function showSkillPalette() {
+  if (!cachedSkills) {
+    try { cachedSkills = (await api('/api/skills')).skills; } catch { cachedSkills = []; }
+  }
+  const palette = $('skillPalette');
+  palette.innerHTML = '';
+  skillIdx = -1;
+  const input = $('chatInput').value.slice(1).toLowerCase();
+  // Combine client commands + server skills
+  const all = [
+    ...CLIENT_COMMANDS.map(c => ({ ...c, isClient: true })),
+    ...(cachedSkills || []).map(s => ({ ...s, isClient: false })),
+  ];
+  const filtered = all.filter(s => s.name.includes(input) || s.description.toLowerCase().includes(input));
+  for (const skill of filtered) {
+    const item = document.createElement('div');
+    item.className = 'skill-item';
+    const badge = skill.isClient ? '<span style="font-size:8px;color:var(--green);margin-left:2px;">&#9679;</span>' : '';
+    item.innerHTML = `<span class="sk-name">/${escapeHtml(skill.name)}${badge}</span><span class="sk-desc">${escapeHtml(skill.description)}</span>`;
+    item.onclick = () => selectSkill(skill.name);
+    palette.appendChild(item);
+  }
+  if (filtered.length > 0) palette.classList.add('open');
+  else palette.classList.remove('open');
+}
+
+function selectSkill(name) {
+  $('chatInput').value = `/${name} `;
+  $('chatInput').focus();
+  $('skillPalette').classList.remove('open');
+}
+
+// Extend chatInput handler to detect / commands
+const origInputHandler = $('chatInput').oninput;
+$('chatInput').addEventListener('input', function() {
+  const val = this.value;
+  if (val.startsWith('/') && !val.includes(' ')) {
+    showSkillPalette();
+  } else {
+    $('skillPalette').classList.remove('open');
+  }
+});
+
+// ===================== CONVERSATION SEARCH =====================
+function openChatSearch() {
+  $('chatSearch').classList.add('open');
+  $('chatSearchInput').focus();
+}
+
+function closeChatSearch() {
+  $('chatSearch').classList.remove('open');
+  $('chatSearchInput').value = '';
+  $('searchCount').textContent = '';
+  // Remove highlights
+  $('chatMessages').querySelectorAll('.search-highlight').forEach(el => {
+    el.replaceWith(el.textContent);
+  });
+}
+
+function searchConversation(query) {
+  // Remove old highlights
+  $('chatMessages').querySelectorAll('.search-highlight').forEach(el => {
+    el.replaceWith(el.textContent);
+  });
+  if (!query || query.length < 2) { $('searchCount').textContent = ''; return; }
+
+  let count = 0;
+  const msgs = $('chatMessages').querySelectorAll('.msg .content-text');
+  const q = query.toLowerCase();
+  for (const el of msgs) {
+    if (el.textContent.toLowerCase().includes(q)) {
+      count++;
+      // Highlight matches (simple text node replacement)
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      for (const node of textNodes) {
+        if (node.textContent.toLowerCase().includes(q)) {
+          const parts = node.textContent.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+          if (parts.length > 1) {
+            const span = document.createElement('span');
+            for (const part of parts) {
+              if (part.toLowerCase() === q) {
+                const mark = document.createElement('mark');
+                mark.className = 'search-highlight';
+                mark.style.cssText = 'background:var(--yellow);color:var(--bg);border-radius:2px;padding:0 1px;';
+                mark.textContent = part;
+                span.appendChild(mark);
+              } else {
+                span.appendChild(document.createTextNode(part));
+              }
+            }
+            node.replaceWith(span);
+          }
+        }
+      }
+    }
+  }
+  $('searchCount').textContent = count > 0 ? `${count} found` : 'No matches';
+}
+
+// Cmd/Ctrl+F in chat: open search
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f' && document.activeElement?.closest('.chat-panel')) {
+    e.preventDefault();
+    openChatSearch();
+  }
+});
+
+// ===================== EXTEND SENDMESSAGE FOR SKILLS =====================
+const origSendMessage = sendMessage;
+sendMessage = async function() {
+  const input = $('chatInput');
+  const msg = input.value.trim();
+  $('skillPalette').classList.remove('open');
+
+  // Handle skill commands
+  if (msg.startsWith('/') && !msg.startsWith('//')) {
+    const parts = msg.substring(1).split(/\s+/);
+    const skillName = parts[0];
+    const args = parts.slice(1).join(' ');
+
+    // Client-side commands (no LLM needed)
+    const clientCmd = handleClientCommand(skillName, args);
+    if (clientCmd) { input.value = ''; return; }
+
+    // Check if it's a known skill
+    if (!cachedSkills) {
+      try { cachedSkills = (await api('/api/skills')).skills; } catch { cachedSkills = []; }
+    }
+    const skill = cachedSkills.find(s => s.name === skillName);
+    if (skill) {
+      input.value = '';
+      $('chatSend').disabled = true;
+      setStatus(`Running /${skillName}...`, 'yellow');
+      addMsg('user', msg);
+
+      try {
+        const res = await fetch('/api/skill', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ name: skillName, args })
+        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantEl = null;
+        let buffer = '';
+        let currentEvent = '';
+
+        while (true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, {stream:true});
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (line.startsWith('event: ')) { currentEvent = line.slice(7); continue; }
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (currentEvent === 'thinking') {
+                  if (data.phase === 'start') addThinkingIndicator();
+                  else if (data.phase === 'delta' && data.text) appendThinkingText(data.text);
+                  else if (data.phase === 'end') finalizeThinking();
+                } else if (currentEvent === 'ask_user') {
+                  showAskUserWidget(data);
+                } else if (data.text) {
+                  if (!assistantEl) { assistantEl = addMsg('assistant', ''); assistantEl.querySelector('.content-text').dataset.raw = ''; }
+                  const textEl = assistantEl.querySelector('.content-text');
+                  textEl.dataset.raw = (textEl.dataset.raw || '') + data.text;
+                  textEl.textContent += data.text;
+                  scrollChat();
+                } else if (data.name && data.input !== undefined) {
+                  addToolIndicator(data.name, data.input, 'running', data.detail);
+                } else if (data.name && data.preview !== undefined) {
+                  updateToolIndicator(data.name, data.preview);
+                } else if (data.todos) {
+                  renderTodos(data.todos);
+                } else if (currentEvent === 'done') {
+                  finalizeAssistantMsg(assistantEl);
+                  finalizeAllToolSpinners();
+                } else if (currentEvent === 'error') {
+                  if (!assistantEl) assistantEl = addMsg('assistant', '');
+                  assistantEl.querySelector('.content-text').textContent += '\nError: ' + data.message;
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch(e) { addMsg('assistant', 'Skill error: ' + e.message); }
+
+      $('chatSend').disabled = false;
+      setStatus('Ready', 'green');
+      updateContext();
+      return;
+    }
+  }
+
+  // Fall through to original sendMessage
+  return origSendMessage.call(this);
+};
+
+// Also handle ask_user events in the main chat SSE stream
+const origSSEParseLine = null; // We need to modify the sendMessage SSE handler
+
+// Patch: intercept ask_user events in main sendMessage flow
+// This is done by modifying the sendMessage function's SSE parsing
+// The easiest approach: also check for ask_user in the main sendMessage
+// Let's patch it by adding ask_user handling to the main SSE loop
+
+// ===================== SPECIAL TAB HELPERS =====================
+/** Open workflow DAG tab */
+function openWorkflowTab(workflowData, title) {
+  openSpecialTab('__workflow__', 'workflow', title || 'Workflow DAG', workflowData);
+}
+
+/** Open metadata visualization tab */
+function openMetadataTab(metaData, title) {
+  // Always switch to Meta Map mode — don't open metadata iframe in Code tab
+  switchMode('meta');
+}
+
+/** Send message to a special tab iframe */
+function postToSpecialTab(key, message) {
+  const iframe = $('iframeContainer').querySelector(`iframe[data-tab="${key}"]`);
+  if (iframe?.contentWindow) iframe.contentWindow.postMessage(message, '*');
+}
+
+/** Update workflow node status (called during workflow execution) */
+function updateWorkflowNode(nodeId, status) {
+  const msg = { type: 'updateNodeStatus', nodeId, status };
+  // Try both special-tab and mode-iframe keys
+  postToSpecialTab('__workflow__', msg);
+  sendToWorkflowIframe(msg);
+}
+
+// ===================== WORKFLOW MANAGEMENT =====================
+let cachedWorkflows = null;
+let activeWorkflowName = null;
+
+function toggleWorkflowPanel() {
+  const dd = $('wfDropdown');
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) loadWorkflowList();
+}
+
+// Close workflow panel on click outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.wf-selector')) $('wfDropdown').classList.remove('open');
+});
+
+async function loadWorkflowList() {
+  try {
+    const data = await api('/api/workflows');
+    cachedWorkflows = data.workflows;
+    const list = $('wfList');
+    list.innerHTML = '';
+    if (!data.workflows.length) {
+      list.innerHTML = '<div style="padding:8px 10px;font-size:10px;color:var(--text2);">No workflows found</div>';
+      return;
+    }
+    for (const wf of data.workflows) {
+      const div = document.createElement('div');
+      div.className = 'wf-item';
+      if (wf.name === activeWorkflowName) div.style.background = 'var(--bg3)';
+      div.innerHTML = `<span class="wf-name">${escapeHtml(wf.title || wf.name)}</span><span class="wf-steps">${wf.stepCount} steps</span><span class="wf-view" onclick="event.stopPropagation();viewWorkflow('${escapeHtml(wf.name)}')">View</span>`;
+      div.onclick = () => selectWorkflow(wf.name, wf.title);
+      list.appendChild(div);
+    }
+    // Update binding dropdowns
+    updateBindingDropdowns(data.workflows);
+  } catch { $('wfList').innerHTML = '<div style="padding:8px;font-size:10px;color:var(--red)">Failed to load</div>'; }
+}
+
+async function selectWorkflow(name, title) {
+  activeWorkflowName = name;
+  $('wfDropdown').classList.remove('open');
+  setStatus(`Workflow: ${title || name}`, 'green');
+}
+
+async function viewWorkflow(name) {
+  try {
+    const data = await api(`/api/workflow/${encodeURIComponent(name)}`);
+    if (data.workflow) {
+      openWorkflowTab(data.workflow, data.workflow.name || name);
+    }
+  } catch (e) { setStatus('Failed to load workflow', 'red'); }
+  $('wfDropdown').classList.remove('open');
+}
+
+async function viewMetadataTab() {
+  $('wfDropdown').classList.remove('open');
+  try {
+    let data = await api('/api/metadata');
+    if (!data.meta || !data.meta.apps?.length) {
+      setStatus('Extracting metadata...', 'yellow');
+      data = await api('/api/metadata/extract');
+      setStatus('Metadata extracted', 'green');
+    }
+    openMetadataTab(data.meta || null, 'Project Meta');
+  } catch { openMetadataTab(null, 'Project Meta'); }
+}
+
+// ===================== MODE TABS =====================
+/** Switch between Code / Meta Map / Flow Editor modes */
+function switchMode(mode) {
+  currentMode = mode;
+  // Update mode tab styling
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+
+  if (mode === 'code') {
+    // Show normal editor tabs + content — Code tab shows the selected file
+    $('editorTabs').style.display = 'flex';
+    $('iframeContainer').style.display = 'none';
+    $('codePreview').style.display = 'none';
+    $('mdPreview').style.display = 'none';
+    if (currentFile && openFiles.has(currentFile)) {
+      showTabContent(currentFile);
+    } else if (openFiles.size > 0) {
+      const keys = [...openFiles.keys()].filter(k => openFiles.get(k).type === 'file');
+      if (keys.length > 0) { currentFile = keys[keys.length - 1]; renderTabs(); showTabContent(currentFile); }
+      else { $('cmEditorWrap').style.display = 'none'; $('editor').style.display = 'none'; $('editorPlaceholder').style.display = 'block'; }
+    } else {
+      $('cmEditorWrap').style.display = 'none';
+      $('editor').style.display = 'none';
+      $('editorPlaceholder').style.display = 'block';
+    }
+  } else if (mode === 'meta') {
+    // Show metadata viewer
+    $('editorTabs').style.display = 'none';
+    $('cmEditorWrap').style.display = 'none';
+    $('editor').style.display = 'none';
+    $('codePreview').style.display = 'none';
+    $('mdPreview').style.display = 'none';
+    $('editorPlaceholder').style.display = 'none';
+    $('iframeContainer').style.display = 'block';
+    showModeIframe('metadata', '/metadata-viewer.html', async () => {
+      try {
+        // Try loading existing metadata
+        let data = await api('/api/metadata');
+        // If no metadata, auto-extract from VL files
+        if (!data.meta || !data.meta.apps?.length) {
+          setStatus('Extracting metadata from VL files...', 'yellow');
+          data = await api('/api/metadata/extract');
+          setStatus('Metadata extracted', 'green');
+        }
+        return data.meta ? { type: 'loadMetadata', data: data.meta } : null;
+      } catch { return null; }
+    });
+  } else if (mode === 'flow') {
+    // Show workflow editor with Gen/Adjust toolbar
+    $('editorTabs').style.display = 'none';
+    $('previewBar').style.display = 'none';
+    $('cmEditorWrap').style.display = 'none';
+    $('editor').style.display = 'none';
+    $('editorPlaceholder').style.display = 'none';
+    $('flowToolbar').style.display = 'flex';
+    $('iframeContainer').style.display = 'block';
+    populateFlowWorkflowSelect();
+    loadActiveFlowWorkflow();
+  } else if (mode === 'preview') {
+    // Show live preview
+    $('editorTabs').style.display = 'none';
+    $('cmEditorWrap').style.display = 'none';
+    $('editor').style.display = 'none';
+    $('editorPlaceholder').style.display = 'none';
+    $('previewBar').style.display = 'flex';
+    $('iframeContainer').style.display = 'block';
+    loadPreviewApp();
+  }
+
+  // Hide bars when not in their respective modes
+  if (mode !== 'preview') $('previewBar').style.display = 'none';
+  if (mode !== 'flow') $('flowToolbar').style.display = 'none';
+}
+
+// ===================== PREVIEW =====================
+let previewUrls = {}; // { appId: url }
+
+/** Activate preview mode with URLs */
+function activatePreview(urls) {
+  previewUrls = urls || {};
+  const keys = Object.keys(previewUrls);
+  if (keys.length === 0) {
+    $('previewUrlsPanel').style.display = 'none';
+    return;
+  }
+
+  // Show the Preview tab
+  $('previewModeTab').style.display = '';
+
+  // Populate app selector in preview bar
+  const sel = $('previewAppSelect');
+  sel.innerHTML = '';
+  for (const [appId, url] of Object.entries(previewUrls)) {
+    sel.innerHTML += `<option value="${appId}">${appId}</option>`;
+  }
+
+  // Populate sidebar preview URL list
+  const list = $('previewUrlsList');
+  list.innerHTML = '';
+  for (const [appId, url] of Object.entries(previewUrls)) {
+    const item = document.createElement('div');
+    item.className = 'preview-url-item';
+    item.innerHTML = `<span class="pui-name">${escapeHtml(appId)}</span><span class="pui-url">${escapeHtml(url)}</span>`;
+    item.onclick = () => { window.open(url, '_blank'); };
+    item.title = `Open ${url} in new tab`;
+    list.appendChild(item);
+  }
+  $('previewUrlsPanel').style.display = 'block';
+
+  // Auto-switch to preview mode
+  switchMode('preview');
+}
+
+function loadPreviewApp() {
+  const appId = $('previewAppSelect').value;
+  const url = previewUrls[appId];
+  if (!url) return;
+
+  $('previewUrlLabel').textContent = url;
+  const container = $('iframeContainer');
+  [...container.children].forEach(f => f.style.display = 'none');
+
+  const key = '__mode_preview__';
+  // Remove old preview elements
+  container.querySelector(`iframe[data-tab="${key}"]`)?.remove();
+  container.querySelector('.preview-fallback')?.remove();
+
+  // Try iframe first, then fallback to link card
+  const iframe = document.createElement('iframe');
+  iframe.dataset.tab = key;
+  iframe.src = url;
+  iframe.style.display = 'block';
+  // Detect cross-origin iframe load failure (blank page)
+  let loadOk = false;
+  iframe.onload = () => {
+    try { const _ = iframe.contentDocument?.title; loadOk = true; } catch {
+      // Cross-origin blocked: show fallback
+      showPreviewFallback(container, appId, url);
+    }
+  };
+  // Also set a timeout — if iframe stays blank for 3s, show fallback
+  setTimeout(() => {
+    if (!loadOk) showPreviewFallback(container, appId, url);
+  }, 3000);
+  container.appendChild(iframe);
+}
+
+function showPreviewFallback(container, appId, url) {
+  const key = '__mode_preview__';
+  const iframe = container.querySelector(`iframe[data-tab="${key}"]`);
+  if (iframe) iframe.style.display = 'none';
+  // Don't create duplicate fallback
+  if (container.querySelector('.preview-fallback')) return;
+  const fallback = document.createElement('div');
+  fallback.className = 'preview-fallback';
+  fallback.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;color:var(--text2);';
+  fallback.innerHTML = `
+    <div style="font-size:40px;">&#127760;</div>
+    <div style="font-size:14px;color:var(--text);">Preview cannot be embedded (cross-origin restriction)</div>
+    <div style="font-size:12px;">The VL runtime blocks iframe embedding from localhost.</div>
+    <a href="${url}" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:var(--accent);color:#000;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;">
+      Open ${escapeHtml(appId)} in New Tab &#x2197;
+    </a>
+    <div style="margin-top:12px;font-size:11px;">All app preview links:</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">${Object.entries(previewUrls).map(([id, u]) =>
+      `<a href="${u}" target="_blank" rel="noopener" style="padding:6px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--accent);text-decoration:none;font-size:11px;">${escapeHtml(id)} &#x2197;</a>`
+    ).join('')}</div>
+  `;
+  container.appendChild(fallback);
+}
+
+function refreshPreview() {
+  const key = '__mode_preview__';
+  const iframe = $('iframeContainer').querySelector(`iframe[data-tab="${key}"]`);
+  if (iframe) iframe.src = iframe.src;
+}
+
+function openPreviewExternal() {
+  const appId = $('previewAppSelect').value;
+  const url = previewUrls[appId];
+  if (url) window.open(url, '_blank');
+}
+
+/** Load preview URLs from project profile (saved by VLParse) */
+async function loadPreviewUrlsFromProfile() {
+  try {
+    const data = await api('/api/profile');
+    if (data.profile?.previewUrls && Object.keys(data.profile.previewUrls).length > 0) {
+      activatePreview(data.profile.previewUrls);
+    }
+  } catch {}
+}
+
+/** Show/create a mode iframe (reused across switches) */
+function showModeIframe(type, src, getDataFn) {
+  const container = $('iframeContainer');
+  const key = `__mode_${type}__`;
+  // Hide all iframes
+  [...container.children].forEach(f => f.style.display = 'none');
+  let iframe = container.querySelector(`iframe[data-tab="${key}"]`);
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.dataset.tab = key;
+    iframe.sandbox = 'allow-scripts allow-same-origin';
+    iframe.src = src;
+    iframe.onload = async () => {
+      const msg = await getDataFn();
+      if (msg) iframe.contentWindow.postMessage(msg, '*');
+    };
+    container.appendChild(iframe);
+  } else {
+    iframe.style.display = 'block';
+    // Refresh data
+    getDataFn().then(msg => { if (msg) iframe.contentWindow.postMessage(msg, '*'); });
+  }
+  iframe.style.display = 'block';
+}
+
+// ===================== FOLDER PATH =====================
+function openFolderInFinder() {
+  if (!currentWorkDir) return;
+  // Use backend to open folder (cross-platform)
+  fetch('/api/open-folder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: currentWorkDir }),
+  }).catch(() => {});
+}
+
+// ===================== WORKFLOW BINDINGS =====================
+function loadWorkflowBindings() {
+  try {
+    const saved = localStorage.getItem('vl-code-wf-bindings');
+    if (saved) workflowBindings = JSON.parse(saved);
+  } catch {}
+}
+
+function saveWorkflowBindings() {
+  workflowBindings.generate = $('wfBindGenerate').value;
+  workflowBindings.adjust = $('wfBindAdjust').value;
+  localStorage.setItem('vl-code-wf-bindings', JSON.stringify(workflowBindings));
+  setStatus(`Bindings: Generate→${workflowBindings.generate}, Adjust→${workflowBindings.adjust}`, 'green');
+}
+
+function updateBindingDropdowns(workflows) {
+  const genSel = $('wfBindGenerate');
+  const adjSel = $('wfBindAdjust');
+  genSel.innerHTML = '';
+  adjSel.innerHTML = '';
+  for (const wf of workflows) {
+    genSel.innerHTML += `<option value="${escapeHtml(wf.name)}"${wf.name === workflowBindings.generate ? ' selected' : ''}>${escapeHtml(wf.title || wf.name)}</option>`;
+    adjSel.innerHTML += `<option value="${escapeHtml(wf.name)}"${wf.name === workflowBindings.adjust ? ' selected' : ''}>${escapeHtml(wf.title || wf.name)}</option>`;
+  }
+}
+
+// Listen for messages from embedded iframes
+window.addEventListener('message', (e) => {
+  if (!e.data?.type) return;
+  if (e.data.type === 'nodeClick') {
+    // User clicked a node in workflow DAG — could highlight related file
+    setStatus(`Node: ${e.data.nodeId || e.data.nodeName || 'unknown'}`, 'green');
+  }
+  if (e.data.type === 'metaNodeClick') {
+    // User clicked a node in metadata graph — could navigate to related file
+    setStatus(`Meta: ${e.data.nodeType}/${e.data.nodeName || 'unknown'}`, 'green');
+  }
+});
+
+// Extend SSE handler for workflow/metadata events
+const origConnectSSE = connectSSE;
+connectSSE = function() {
+  const es = new EventSource('/api/events');
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'file_changed') {
+        setStatus(`Changed: ${data.path}`, 'yellow');
+        setTimeout(() => setStatus('Ready', 'green'), 2000);
+      }
+      if (data.type === 'validation_result') {
+        setStatus(data.result?.substring(0, 60) || 'Validated', data.result?.includes('Error') ? 'red' : 'green');
+      }
+      if (data.type === 'project_reloaded') {
+        loadFileTree();
+        loadProjectInfo();
+      }
+      if (data.type === 'settings_changed') {
+        loadProjectInfo();
+      }
+      // Workflow node status updates
+      if (data.type === 'workflow_node_update') {
+        updateWorkflowNode(data.nodeId, data.status);
+      }
+      // Metadata ready — auto-open metadata tab
+      if (data.type === 'metadata_ready' && data.meta) {
+        openMetadataTab(data.meta);
+      }
+    } catch {}
+  };
+};
+
+// ===================== SYNTAX HIGHLIGHTING =====================
+function highlightCode(code, ext) {
+  const lines = code.split('\n');
+  const isVL = ['vx','sc','cp','vs','vdb','vth'].includes(ext);
+  const isJson = ext === 'json';
+
+  return lines.map(line => {
+    let html = escapeHtml(line);
+    if (isVL) {
+      html = highlightVL(html);
+    } else if (isJson) {
+      html = highlightJSON(html);
+    }
+    return `<span class="line">${html}</span>`;
+  }).join('\n');
+}
+
+function highlightVL(line) {
+  // Comments
+  if (/^\s*\/\//.test(line)) return `<span class="cmt">${line}</span>`;
+  // Keywords
+  line = line.replace(/\b(SECTION|SERVICE|PUBLIC_SERVICE|EVENT|HANDLER|RETURN|IF|ELSE|FOR|EACH|SET|LET|TRUE|FALSE|NULL|LAYOUT|STYLE|NAVIGATION|DATA|METHODS|COMPUTED|INIT|MOUNTED|WATCH|COMPONENT|PROPS|EMIT|SLOT|ACTION|ASYNC|AWAIT|TRY|CATCH)\b/g, '<span class="kw">$1</span>');
+  // Tags like <Section-X> <Component-Y> <ServiceDomain-Z>
+  line = line.replace(/(&lt;)([\w-]+)(\/?\s*&gt;|[^&]*&gt;)/g, '<span class="tag">$1$2$3</span>');
+  // $variables
+  line = line.replace(/(\$\w+)/g, '<span class="var">$1</span>');
+  // @events
+  line = line.replace(/(@\w+)/g, '<span class="evt">$1</span>');
+  // Strings
+  line = line.replace(/(&quot;[^&]*&quot;|&#39;[^&]*&#39;|"[^"]*"|'[^']*')/g, '<span class="str">$1</span>');
+  // Numbers
+  line = line.replace(/\b(\d+\.?\d*)\b/g, '<span class="num">$1</span>');
+  return line;
+}
+
+function highlightJSON(line) {
+  // Property keys
+  line = line.replace(/(&quot;)([^&]+)(&quot;)\s*:/g, '<span class="prop">$1$2$3</span>:');
+  // String values
+  line = line.replace(/:\s*(&quot;)([^&]*)(&quot;)/g, ': <span class="str">$1$2$3</span>');
+  // Numbers
+  line = line.replace(/:\s*(\d+\.?\d*)/g, ': <span class="num">$1</span>');
+  // Booleans / null
+  line = line.replace(/:\s*(true|false|null)\b/g, ': <span class="kw">$1</span>');
+  return line;
+}
+
+function renderMarkdown(md) {
+  // Simple markdown to HTML converter
+  let html = escapeHtml(md);
+  // Headers
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Bold / italic
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Code blocks
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Blockquotes
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  // Unordered lists
+  html = html.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>');
+  html = html.replace(/<\/ul>\s*<ul>/g, '');
+  // Ordered lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  // Paragraphs (double newline)
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = '<p>' + html + '</p>';
+  // Clean up empty paragraphs
+  html = html.replace(/<p>\s*<(h[123]|ul|ol|pre|blockquote)/g, '<$1');
+  html = html.replace(/<\/(h[123]|ul|ol|pre|blockquote)>\s*<\/p>/g, '</$1>');
+  return html;
+}
+
+// ===================== FLOW EDITOR TOOLBAR =====================
+let currentFlowTab = 'generate'; // 'generate' or 'adjust'
+
+function switchFlowTab(tab) {
+  currentFlowTab = tab;
+  document.querySelectorAll('.flow-sub-tab').forEach(t => t.classList.toggle('active', t.dataset.flow === tab));
+  populateFlowWorkflowSelect();
+  loadActiveFlowWorkflow();
+}
+
+async function populateFlowWorkflowSelect() {
+  const sel = $('flowWfSelect');
+  sel.innerHTML = '<option value="">-- Select Workflow --</option>';
+  try {
+    const data = await api('/api/workflows');
+    for (const wf of (data.workflows || [])) {
+      const isDefault = (currentFlowTab === 'generate' && wf.name === (workflowBindings.generate || '3-file-codegen'))
+        || (currentFlowTab === 'adjust' && wf.name === (workflowBindings.adjust || 'incremental-update'));
+      sel.innerHTML += `<option value="${escapeHtml(wf.name)}"${isDefault ? ' selected' : ''}>${escapeHtml(wf.title || wf.name)} (${wf.stepCount} steps)</option>`;
+    }
+  } catch {}
+}
+
+function loadActiveFlowWorkflow() {
+  const sel = $('flowWfSelect');
+  const name = sel.value || (currentFlowTab === 'generate' ? (workflowBindings.generate || '3-file-codegen') : (workflowBindings.adjust || 'incremental-update'));
+  if (name) loadFlowWorkflow(name);
+}
+
+async function loadFlowWorkflow(name) {
+  if (!name) return;
+  try {
+    const data = await api(`/api/workflow/${encodeURIComponent(name)}`);
+    if (data.workflow) {
+      showModeIframe('workflow', '/workflow-editor.html', async () => {
+        return { type: 'loadWorkflow', data: data.workflow };
+      });
+    }
+  } catch { setStatus('Failed to load workflow', 'red'); }
+}
+
+function importFlowJson() { $('flowJsonInput').click(); }
+
+$('flowJsonInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const json = JSON.parse(reader.result);
+      // Show in the DAG viewer
+      showModeIframe('workflow', '/workflow-editor.html', async () => {
+        return { type: 'loadWorkflow', data: json };
+      });
+      // Also save to server
+      const name = file.name.replace('.json', '');
+      fetch(`/api/workflow/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(json),
+      }).then(() => {
+        populateFlowWorkflowSelect();
+        setStatus(`Loaded workflow: ${name}`, 'green');
+      }).catch(() => {});
+    } catch { setStatus('Invalid JSON file', 'red'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// Drag-drop workflow JSON onto flow editor area
+document.addEventListener('dragover', (e) => {
+  if (currentMode === 'flow') e.preventDefault();
+});
+document.addEventListener('drop', (e) => {
+  if (currentMode !== 'flow') return;
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.name.endsWith('.json')) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const json = JSON.parse(reader.result);
+      showModeIframe('workflow', '/workflow-editor.html', async () => {
+        return { type: 'loadWorkflow', data: json };
+      });
+      const name = file.name.replace('.json', '');
+      fetch(`/api/workflow/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(json),
+      }).then(() => {
+        populateFlowWorkflowSelect();
+        setStatus(`Dropped workflow: ${name}`, 'green');
+      }).catch(() => {});
+    } catch { setStatus('Invalid JSON file', 'red'); }
+  };
+  reader.readAsText(file);
+});
+
+// ===================== RUN WORKFLOW =====================
+async function runFlowWorkflow() {
+  const wfName = $('flowWfSelect').value;
+  if (!wfName) { setStatus('Select a workflow first', 'yellow'); return; }
+  if (flowRunning) return;
+
+  // Prompt user for request description
+  const userRequest = prompt('Describe what to generate or modify:', '');
+  if (!userRequest) return;
+
+  flowRunning = true;
+  const btn = $('flowRunBtn');
+  const statusEl = $('flowRunStatus');
+  btn.disabled = true;
+  btn.classList.add('running');
+  btn.innerHTML = '&#9881; Running...';
+  statusEl.textContent = 'Starting...';
+  setStatus('Workflow running...', 'yellow');
+
+  // Clear previous node statuses in DAG iframe
+  sendToWorkflowIframe({ type: 'clearStatus' });
+
+  let filesCount = 0;
+  let lastError = null;
+
+  try {
+    const res = await fetch('/api/workflow/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflowName: wfName, params: { userRequest, targetLang: 'en' } }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE: "event: type\ndata: json\n\n"
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop(); // keep incomplete block
+      for (const block of blocks) {
+        let evtType = 'message', evtData = null;
+        for (const line of block.split('\n')) {
+          if (line.startsWith('event: ')) evtType = line.slice(7).trim();
+          else if (line.startsWith('data: ')) {
+            try { evtData = JSON.parse(line.slice(6)); } catch {}
+          }
+        }
+        if (!evtData) continue;
+
+        switch (evtType) {
+          case 'node_start':
+            sendToWorkflowIframe({ type: 'updateNodeStatus', nodeId: evtData.nodeId, status: 'running' });
+            statusEl.textContent = evtData.title || evtData.nodeId;
+            break;
+          case 'node_done':
+            sendToWorkflowIframe({ type: 'updateNodeStatus', nodeId: evtData.nodeId, status: 'done' });
+            break;
+          case 'node_error':
+            sendToWorkflowIframe({ type: 'updateNodeStatus', nodeId: evtData.nodeId, status: 'error' });
+            lastError = evtData.error;
+            break;
+          case 'file_written':
+            filesCount++;
+            statusEl.textContent = `${filesCount} files written`;
+            break;
+          case 'done':
+            statusEl.textContent = `Done! ${evtData.filesWritten?.length || filesCount} files`;
+            break;
+          case 'error':
+            lastError = evtData.message;
+            statusEl.textContent = 'Error: ' + (evtData.message || '').slice(0, 60);
+            break;
+        }
+      }
+    }
+  } catch (e) {
+    lastError = e.message;
+    statusEl.textContent = 'Error';
+  }
+
+  // Reset button state
+  flowRunning = false;
+  btn.disabled = false;
+  btn.classList.remove('running');
+  btn.innerHTML = '&#9654; Run';
+  await loadFileTree();
+  setStatus(lastError ? 'Workflow finished with errors' : `Done: ${filesCount} files generated`, lastError ? 'red' : 'green');
+}
+
+/** Send a postMessage to the workflow-editor iframe */
+function sendToWorkflowIframe(msg) {
+  const container = $('iframeContainer');
+  const iframe = container?.querySelector('iframe[data-tab="__mode_workflow__"]');
+  if (iframe?.contentWindow) iframe.contentWindow.postMessage(msg, '*');
+}
+
+// ===================== EXPORT ZIP =====================
+// Import files into current project (adds to file tree)
+async function importFiles() { loadFolder(); }
+
+// Create new project from ZIP: extract to parent/newdir with helper files
+async function importZipAsProject() { importZip(); }
+
+// Export all files (VL + Process/ + .vl-code/ + helpers)
+async function exportAll() {
+  setStatus('Exporting all files...', 'yellow');
+  try {
+    const res = await fetch('/api/export-zip?scope=all');
+    if (!res.ok) { setStatus('Export failed', 'red'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (currentWorkDir ? currentWorkDir.split('/').pop() : 'vl-project') + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus('Exported all files', 'green');
+  } catch { setStatus('Export failed', 'red'); }
+}
+
+// Export VL files only (.vx, .sc, .cp, .vs, .vdb, .vth)
+async function exportVLOnly() {
+  setStatus('Exporting VL files...', 'yellow');
+  try {
+    const res = await fetch('/api/export-zip?scope=vl');
+    if (!res.ok) { setStatus('Export failed', 'red'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (currentWorkDir ? currentWorkDir.split('/').pop() : 'vl-project') + '_VL.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setStatus('Exported VL files', 'green');
+  } catch { setStatus('Export failed', 'red'); }
+}
+
+// Legacy alias
+async function exportZip() { return exportAll(); }
+
+// ===================== COMPILE & PREVIEW =====================
+async function compileProject() {
+  const btn = $('compileBtn');
+  btn.disabled = true;
+  btn.innerHTML = '&#9203; Compiling...';
+  btn.style.opacity = '0.6';
+  setStatus('Compiling project...', 'yellow');
+  try {
+    const res = await fetch('/api/compile', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (data.error) {
+      setStatus('Compile failed: ' + data.error, 'red');
+      addMsg('assistant', 'Compile failed: ' + data.error);
+      return;
+    }
+    // Show results
+    const urls = data.previewUrls || {};
+    const keys = Object.keys(urls);
+    const errList = data.errList || [];
+    const errCount = errList.length;
+    if (keys.length > 0) {
+      activatePreview(urls);
+      const urlList = keys.map(k => `  ${k}: ${urls[k]}`).join('\n');
+      const statusIcon = errCount > 0 ? '⚠' : '✓';
+      addMsg('assistant', `**Compile ${errCount > 0 ? 'completed with ' + errCount + ' error(s)' : 'success'}** (GID: ${data.gid})\n\n**Preview URLs:**\n${urlList}`);
+      setStatus(errCount > 0 ? `Compiled — ${errCount} error(s)` : 'Compiled — preview ready', errCount > 0 ? 'yellow' : 'green');
+    } else {
+      setStatus(errCount > 0 ? `Compiled — ${errCount} error(s)` : 'Compiled (no preview URLs)', errCount > 0 ? 'yellow' : 'green');
+      addMsg('assistant', 'Compile done but no preview URLs returned.');
+    }
+    if (errCount > 0) {
+      // Format errors with numbering and structure
+      const errLines = errList.map((e, i) => {
+        if (typeof e === 'string') return `  ${i + 1}. ${e}`;
+        if (typeof e === 'object') return `  ${i + 1}. **${e.file || e.type || 'Error'}**: ${e.message || e.msg || JSON.stringify(e)}`;
+        return `  ${i + 1}. ${JSON.stringify(e)}`;
+      }).join('\n');
+      addMsg('assistant', `**Compile Errors (${errCount}):**\n${errLines}\n\n_These errors are saved to .vl-code/last-compile.json. Use /compile-errors to review, or ask the AI to debug them._`);
+    }
+  } catch (e) {
+    setStatus('Compile error', 'red');
+    addMsg('assistant', 'Compile error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '&#9654; Compile';
+    btn.style.opacity = '1';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "ConcertReg",
+  "version": "2.91",
+  "type": "vl-project",
+  "description": "露天音乐会报名系统 - 用户端应用，提供音乐会浏览、报名购票、电子票查看等功能",
+  "createdAt": "2026-03-01T12:10:03.256Z",
+  "apps": ["ConcertApp"],
+  "theme": "Theme-Default"
+}

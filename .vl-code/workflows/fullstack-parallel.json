@@ -1,0 +1,242 @@
+{
+  "version": "3.13",
+  "name": "FullStack-Parallel-CodeGen",
+  "registry": {
+    "params": [
+      "userRequest(STRING)",
+      "targetLang(STRING)"
+    ],
+    "services": [],
+    "apis": [],
+    "components": [],
+    "vars": [
+      "$prdJson(OBJECT)",
+      "$prdJsonStr(STRING)",
+      "$vdbContent(STRING)",
+      "$serviceMapJson(OBJECT)",
+      "$serviceMapJsonStr(STRING)",
+      "$uiMapJson(OBJECT)",
+      "$uiMapJsonStr(STRING)"
+    ],
+    "files": {
+      "inputs": [
+        "Process/Input/*",
+        "Theme/Theme-Default.vth"
+      ],
+      "artifacts": [
+        "Process/Artifacts/*",
+        "Database/*",
+        "Services/*",
+        "Sections/*",
+        "ExtComponents/*",
+        "Apps/*"
+      ]
+    },
+    "docs": {
+      "1": "VL Syntax Rules",
+      "31": "Agent-100-PRD-Prompt",
+      "32": "Agent-200-DB-Prompt",
+      "33": "Agent-300-ServiceMap-Prompt",
+      "34": "Agent-400-UIMap-Prompt",
+      "35": "Agent-500-Component-Prompt",
+      "36": "Agent-600-ServiceDomain-Prompt",
+      "37": "Agent-700-Section-Prompt",
+      "38": "Agent-800-AppEntry-Prompt"
+    }
+  },
+  "steps": [
+    {
+      "id": "LLM_100_PRD",
+      "meta": { "title": "Agent-1 · PRD Analysis" },
+      "in": {
+        "docs": ["1", "31"],
+        "max_tokens": 8192,
+        "messages": [
+          { "role": "user", "content": "Requirement:" },
+          { "role": "user", "content": "=userRequest" },
+          { "role": "user", "content": "Target Language:" },
+          { "role": "user", "content": "=targetLang" }
+        ],
+        "output_config": { "format": { "type": "json_object" } }
+      },
+      "out": {
+        "$prdJson": "=_result",
+        "$prdJsonStr": "=_result + ''",
+        "/Process/Artifacts/PRD.json": "=_result"
+      },
+      "next": "Fork_AuxFiles"
+    },
+    {
+      "id": "Fork_AuxFiles",
+      "meta": { "title": "Phase 2-3 · DB + ServiceMap (parallel)" },
+      "children": ["LLM_200_DB", "LLM_300_ServiceMap"],
+      "next": "LLM_400_UIMap"
+    },
+    {
+      "id": "LLM_200_DB",
+      "meta": { "title": "Agent-2 · VDB Database Generation" },
+      "in": {
+        "stream": true,
+        "docs": ["1", "32"],
+        "max_tokens": 16000,
+        "messages": [
+          { "role": "user", "content": "PRD:" },
+          { "role": "user", "content": "=$prdJsonStr" }
+        ]
+      },
+      "out": {
+        "$vdbContent": "=_result",
+        "/Database/Project.vdb": "=_result"
+      }
+    },
+    {
+      "id": "LLM_300_ServiceMap",
+      "meta": { "title": "Agent-3 · ServiceMap Service Contract" },
+      "in": {
+        "docs": ["1", "33"],
+        "max_tokens": 8192,
+        "messages": [
+          { "role": "user", "content": "PRD:" },
+          { "role": "user", "content": "=$prdJsonStr" }
+        ],
+        "output_config": { "format": { "type": "json_object" } }
+      },
+      "out": {
+        "$serviceMapJson": "=_result",
+        "$serviceMapJsonStr": "=_result + ''",
+        "/Process/Artifacts/ServiceMap.json": "=_result"
+      }
+    },
+    {
+      "id": "LLM_400_UIMap",
+      "meta": { "title": "Agent-4 · UIMap UI Architecture" },
+      "in": {
+        "docs": ["1", "34"],
+        "max_tokens": 16000,
+        "messages": [
+          { "role": "user", "content": "PRD:" },
+          { "role": "user", "content": "=$prdJsonStr" },
+          { "role": "user", "content": "ServiceMap:" },
+          { "role": "user", "content": "=$serviceMapJsonStr" }
+        ],
+        "output_config": { "format": { "type": "json_object" } }
+      },
+      "out": {
+        "$uiMapJson": "=_result",
+        "$uiMapJsonStr": "=_result + ''",
+        "/Process/Artifacts/UIMap.json": "=_result"
+      },
+      "next": "Fork_AllCodeGen"
+    },
+    {
+      "id": "Fork_AllCodeGen",
+      "meta": { "title": "Phase 5-8 · All Code Generation (parallel)" },
+      "children": ["Loop_Components", "Loop_ServiceDomains", "Loop_Sections", "Loop_Apps"],
+      "next": "Stop_Done"
+    },
+    {
+      "id": "Loop_Components",
+      "meta": { "title": "Phase-5 · Component Generation (.cp)" },
+      "source": "=$uiMapJson.components",
+      "mode": "parallel",
+      "children": ["LLM_500_Component"]
+    },
+    {
+      "id": "LLM_500_Component",
+      "meta": { "title": "Agent-5 · .cp Component" },
+      "in": {
+        "stream": true,
+        "docs": ["1", "35"],
+        "max_tokens": 16000,
+        "messages": [
+          { "role": "user", "content": "ComponentItem:" },
+          { "role": "user", "content": "=_item + ''" },
+          { "role": "user", "content": "UIMap:" },
+          { "role": "user", "content": "=$uiMapJsonStr" }
+        ]
+      },
+      "out": { "/{_item.filePath}": "=_result" },
+      "next": "RETURN"
+    },
+    {
+      "id": "Loop_ServiceDomains",
+      "meta": { "title": "Phase-6 · Service Generation (.vs)" },
+      "source": "=$serviceMapJson.serviceDomains",
+      "mode": "parallel",
+      "children": ["LLM_600_ServiceDomain"]
+    },
+    {
+      "id": "LLM_600_ServiceDomain",
+      "meta": { "title": "Agent-6 · .vs Service" },
+      "in": {
+        "stream": true,
+        "docs": ["1", "36"],
+        "max_tokens": 16000,
+        "messages": [
+          { "role": "user", "content": "DomainItem:" },
+          { "role": "user", "content": "=_item + ''" },
+          { "role": "user", "content": "ServiceMap:" },
+          { "role": "user", "content": "=$serviceMapJsonStr" },
+          { "role": "user", "content": "VDB:" },
+          { "role": "user", "content": "=$vdbContent" }
+        ]
+      },
+      "out": { "/{_item.filePath}": "=_result" },
+      "next": "RETURN"
+    },
+    {
+      "id": "Loop_Sections",
+      "meta": { "title": "Phase-7 · Section Generation (.sc)" },
+      "source": "=$uiMapJson.sections",
+      "mode": "parallel",
+      "children": ["LLM_700_Section"]
+    },
+    {
+      "id": "LLM_700_Section",
+      "meta": { "title": "Agent-7 · .sc Section" },
+      "in": {
+        "stream": true,
+        "docs": ["1", "37"],
+        "max_tokens": 16000,
+        "messages": [
+          { "role": "user", "content": "SectionItem:" },
+          { "role": "user", "content": "=_item + ''" },
+          { "role": "user", "content": "UIMap:" },
+          { "role": "user", "content": "=$uiMapJsonStr" },
+          { "role": "user", "content": "ServiceMap:" },
+          { "role": "user", "content": "=$serviceMapJsonStr" }
+        ]
+      },
+      "out": { "/{_item.filePath}": "=_result" },
+      "next": "RETURN"
+    },
+    {
+      "id": "Loop_Apps",
+      "meta": { "title": "Phase-8 · App Entry Generation (.vx)" },
+      "source": "=$uiMapJson.apps",
+      "mode": "parallel",
+      "children": ["LLM_800_AppEntry"]
+    },
+    {
+      "id": "LLM_800_AppEntry",
+      "meta": { "title": "Agent-8 · .vx App Entry" },
+      "in": {
+        "stream": true,
+        "docs": ["1", "38"],
+        "max_tokens": 16000,
+        "messages": [
+          { "role": "user", "content": "AppItem:" },
+          { "role": "user", "content": "=_item + ''" },
+          { "role": "user", "content": "UIMap:" },
+          { "role": "user", "content": "=$uiMapJsonStr" }
+        ]
+      },
+      "out": { "/{_item.filePath}": "=_result" },
+      "next": "RETURN"
+    },
+    {
+      "id": "Stop_Done",
+      "meta": { "title": "Code Generation Complete" }
+    }
+  ]
+}

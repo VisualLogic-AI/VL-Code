@@ -1,0 +1,884 @@
+{
+  "version": "3.5",
+  "name": "VL_FullStack_CodeGen_9Files_v1",
+  "registry": {
+    "services": [
+      "ValidateSpecs(intent(OBJECT), domain(OBJECT), services(OBJECT), ui(OBJECT), manifest(OBJECT), deps(OBJECT), quality(OBJECT)) RETURN success(BOOL), errors([STRING]), warnings([STRING])",
+      "ValidateExecutionPlan(plan(OBJECT), manifest(OBJECT), deps(OBJECT)) RETURN success(BOOL), errors([STRING]), warnings([STRING])",
+      "ValidateVLProject(manifest(OBJECT), quality(OBJECT), strict(BOOL)) RETURN success(BOOL), errors([STRING]), warnings([STRING]), failedFiles([STRING]), stats(OBJECT)"
+    ],
+    "apis": [],
+    "components": [],
+    "vars": [
+      "$userRequirement(STRING)",
+      "$userChoices(OBJECT)",
+      "$projectContext(OBJECT)",
+      "$runMode(STRING)",
+      "$runState(OBJECT)",
+      "$intentSpec(OBJECT)",
+      "$domainSchema(OBJECT)",
+      "$serviceContractMap(OBJECT)",
+      "$uiContractMap(OBJECT)",
+      "$moduleManifest(OBJECT)",
+      "$dependencyGraph(OBJECT)",
+      "$qualityGateSpec(OBJECT)",
+      "$specValidation(OBJECT)",
+      "$specValidationFinal(OBJECT)",
+      "$executionPlan(OBJECT)",
+      "$planValidation(OBJECT)",
+      "$vdbCode(STRING)",
+      "$vthCode(STRING)",
+      "$serviceGenResults([OBJECT])",
+      "$componentGenResults([OBJECT])",
+      "$sectionGenResults([OBJECT])",
+      "$appGenResults([OBJECT])",
+      "$codeValidation(OBJECT)",
+      "$repairPlan(OBJECT)",
+      "$repairResults([OBJECT])",
+      "$codeValidationFinal(OBJECT)",
+      "$finalReport(OBJECT)"
+    ],
+    "files": {
+      "inputs": [
+        "Process/Input/*",
+        "base doc/VL_2.5.txt",
+        "base doc/VL Workflow Spec_3.5.txt"
+      ],
+      "artifacts": [
+        "Process/Specs/*",
+        "Process/Run/*",
+        "Process/Reports/*",
+        "Database/*",
+        "Theme/*",
+        "Services/*",
+        "Sections/*",
+        "ExtComponents/*",
+        "Apps/*"
+      ]
+    },
+    "docs": {
+      "10": "VL 2.5 syntax and file system constraints",
+      "11": "Workflow 3.5 control flow, eager execution, and graph simplicity",
+      "12": "Auxiliary 9-file spec and cross-file consistency constraints"
+    }
+  },
+  "steps": [
+    {
+      "id": "Set_InitRunState",
+      "target": "$runState",
+      "value": "{phase:\"init\",status:\"running\"}",
+      "next": "Write_RunState_Init",
+      "meta": {
+        "title": "Initialize RunState"
+      }
+    },
+    {
+      "id": "Write_RunState_Init",
+      "mode": "overwrite",
+      "target": "\"/Process/Run/RunState.json\"",
+      "value": "$runState",
+      "next": "LLM_GenIntentSpec",
+      "meta": {
+        "title": "Persist initial RunState"
+      }
+    },
+    {
+      "id": "LLM_GenIntentSpec",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Specs/IntentSpec.json only. Output strict JSON object only. Follow naming rules and shared-layout detection rules."
+          },
+          {
+            "role": "user",
+            "content": "Requirement: $userRequirement\nChoices: $userChoices\nContext: $projectContext"
+          }
+        ]
+      },
+      "out": {
+        "$intentSpec": "_result",
+        "/Process/Specs/IntentSpec.json": "_result",
+        "$runState.phase": "\"intent_done\""
+      },
+      "next": "LLM_GenDomainSchema",
+      "meta": {
+        "title": "Agent-100 Intent"
+      }
+    },
+    {
+      "id": "LLM_GenDomainSchema",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Specs/DomainSchema.json only. Use exact VL types and canonical valueDomains."
+          },
+          {
+            "role": "user",
+            "content": "Input IntentSpec: $intentSpec"
+          }
+        ]
+      },
+      "out": {
+        "$domainSchema": "_result",
+        "/Process/Specs/DomainSchema.json": "_result",
+        "$runState.phase": "\"domain_done\""
+      },
+      "next": "Set_FanoutContractDesign",
+      "meta": {
+        "title": "Agent-200 DomainSchema"
+      }
+    },
+    {
+      "id": "Set_FanoutContractDesign",
+      "target": "$runState.phase",
+      "value": "\"contract_design\"",
+      "children": ["LLM_GenServiceContractMap", "LLM_GenQualityGateSpec"],
+      "next": "LLM_GenUIContractMap",
+      "meta": {
+        "title": "Parallel spec fanout"
+      }
+    },
+    {
+      "id": "LLM_GenServiceContractMap",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Specs/ServiceContractMap.json only. Keep strict serviceId format DomainId.ServiceName and exact output type schemas."
+          },
+          {
+            "role": "user",
+            "content": "Input IntentSpec: $intentSpec\nInput DomainSchema: $domainSchema"
+          }
+        ]
+      },
+      "out": {
+        "$serviceContractMap": "_result",
+        "/Process/Specs/ServiceContractMap.json": "_result"
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-300 Service contracts"
+      }
+    },
+    {
+      "id": "LLM_GenQualityGateSpec",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "11", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Specs/QualityGateSpec.json only. Include spec integrity and VL code safety gate rules."
+          },
+          {
+            "role": "user",
+            "content": "Input IntentSpec: $intentSpec\nInput DomainSchema: $domainSchema"
+          }
+        ]
+      },
+      "out": {
+        "$qualityGateSpec": "_result",
+        "/Process/Specs/QualityGateSpec.json": "_result"
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-700 Quality gates"
+      }
+    },
+    {
+      "id": "LLM_GenUIContractMap",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Specs/UIContractMap.json only. Enforce section cohesion, event wiring completeness, and app/section/component boundaries."
+          },
+          {
+            "role": "user",
+            "content": "Input IntentSpec: $intentSpec\nInput DomainSchema: $domainSchema\nInput ServiceContractMap: $serviceContractMap"
+          }
+        ]
+      },
+      "out": {
+        "$uiContractMap": "_result",
+        "/Process/Specs/UIContractMap.json": "_result",
+        "$runState.phase": "\"ui_done\""
+      },
+      "next": "Set_FanoutManifestGraph",
+      "meta": {
+        "title": "Agent-400 UI contracts"
+      }
+    },
+    {
+      "id": "Set_FanoutManifestGraph",
+      "target": "$runState.phase",
+      "value": "\"manifest_graph\"",
+      "children": ["LLM_GenModuleManifest", "LLM_GenDependencyGraph"],
+      "next": "Service_ValidateSpecs",
+      "meta": {
+        "title": "Parallel manifest+graph"
+      }
+    },
+    {
+      "id": "LLM_GenModuleManifest",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Specs/ModuleManifest.json only. Enumerate all VL files with canonical paths and generator ownership."
+          },
+          {
+            "role": "user",
+            "content": "Input IntentSpec: $intentSpec\nInput ServiceContractMap: $serviceContractMap\nInput UIContractMap: $uiContractMap"
+          }
+        ]
+      },
+      "out": {
+        "$moduleManifest": "_result",
+        "/Process/Specs/ModuleManifest.json": "_result"
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-500 Module manifest"
+      }
+    },
+    {
+      "id": "LLM_GenDependencyGraph",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["11", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Specs/DependencyGraph.json only. Build accurate module/service/state dependency edges for impact analysis and scheduling."
+          },
+          {
+            "role": "user",
+            "content": "Input ServiceContractMap: $serviceContractMap\nInput UIContractMap: $uiContractMap\nInput ModuleManifest: $moduleManifest"
+          }
+        ]
+      },
+      "out": {
+        "$dependencyGraph": "_result",
+        "/Process/Specs/DependencyGraph.json": "_result"
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-600 Dependency graph"
+      }
+    },
+    {
+      "id": "Service_ValidateSpecs",
+      "in": {
+        "intent": "$intentSpec",
+        "domain": "$domainSchema",
+        "services": "$serviceContractMap",
+        "ui": "$uiContractMap",
+        "manifest": "$moduleManifest",
+        "deps": "$dependencyGraph",
+        "quality": "$qualityGateSpec"
+      },
+      "out": {
+        "$specValidation": "_result",
+        "/Process/Run/SpecValidation-R1.json": "_result"
+      },
+      "next": "Branch_SpecValidationRound1",
+      "meta": {
+        "title": "Spec validation round 1"
+      }
+    },
+    {
+      "id": "Branch_SpecValidationRound1",
+      "cases": [
+        ["$specValidation.success == true", "Set_SpecRound1Pass"],
+        ["ELSE", "LLM_RepairSpecs"]
+      ],
+      "next": "Service_ValidateSpecsFinal",
+      "meta": {
+        "title": "Spec gate branch"
+      }
+    },
+    {
+      "id": "Set_SpecRound1Pass",
+      "target": "$runState.phase",
+      "value": "\"spec_valid_r1\"",
+      "next": "RETURN",
+      "meta": {
+        "title": "Spec pass mark"
+      }
+    },
+    {
+      "id": "LLM_RepairSpecs",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "11", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Repair all spec files with validation errors. Return one JSON object with keys: intentSpec, domainSchema, serviceContractMap, uiContractMap, moduleManifest, dependencyGraph, qualityGateSpec."
+          },
+          {
+            "role": "user",
+            "content": "Errors: $specValidation.errors\nWarnings: $specValidation.warnings\nCurrent Intent: $intentSpec\nCurrent Domain: $domainSchema\nCurrent ServiceMap: $serviceContractMap\nCurrent UIMap: $uiContractMap\nCurrent Manifest: $moduleManifest\nCurrent Graph: $dependencyGraph\nCurrent Quality: $qualityGateSpec"
+          }
+        ]
+      },
+      "out": {
+        "$intentSpec": "_result.intentSpec",
+        "$domainSchema": "_result.domainSchema",
+        "$serviceContractMap": "_result.serviceContractMap",
+        "$uiContractMap": "_result.uiContractMap",
+        "$moduleManifest": "_result.moduleManifest",
+        "$dependencyGraph": "_result.dependencyGraph",
+        "$qualityGateSpec": "_result.qualityGateSpec",
+        "/Process/Specs/IntentSpec.json": "_result.intentSpec",
+        "/Process/Specs/DomainSchema.json": "_result.domainSchema",
+        "/Process/Specs/ServiceContractMap.json": "_result.serviceContractMap",
+        "/Process/Specs/UIContractMap.json": "_result.uiContractMap",
+        "/Process/Specs/ModuleManifest.json": "_result.moduleManifest",
+        "/Process/Specs/DependencyGraph.json": "_result.dependencyGraph",
+        "/Process/Specs/QualityGateSpec.json": "_result.qualityGateSpec"
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Spec repair pass"
+      }
+    },
+    {
+      "id": "Service_ValidateSpecsFinal",
+      "in": {
+        "intent": "$intentSpec",
+        "domain": "$domainSchema",
+        "services": "$serviceContractMap",
+        "ui": "$uiContractMap",
+        "manifest": "$moduleManifest",
+        "deps": "$dependencyGraph",
+        "quality": "$qualityGateSpec"
+      },
+      "out": {
+        "$specValidationFinal": "_result",
+        "/Process/Run/SpecValidation-Final.json": "_result"
+      },
+      "next": "Branch_SpecReady",
+      "meta": {
+        "title": "Spec validation final"
+      }
+    },
+    {
+      "id": "Branch_SpecReady",
+      "cases": [
+        ["$specValidationFinal.success == true", "LLM_BuildExecutionPlan"],
+        ["ELSE", "Stop_SpecFailed"]
+      ],
+      "next": "Set_GenerationStart",
+      "meta": {
+        "title": "Spec ready gate"
+      }
+    },
+    {
+      "id": "LLM_BuildExecutionPlan",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["11", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate Process/Run/ExecutionPlan.json only. Build DAG tasks and parallel groups from module dependencies. Prefer maximal safe parallelism."
+          },
+          {
+            "role": "user",
+            "content": "Run mode: $runMode\nManifest: $moduleManifest\nDependencyGraph: $dependencyGraph\nQualityGateSpec: $qualityGateSpec\nProject context: $projectContext"
+          }
+        ]
+      },
+      "out": {
+        "$executionPlan": "_result",
+        "/Process/Run/ExecutionPlan.json": "_result",
+        "$runState.phase": "\"plan_done\""
+      },
+      "next": "Service_ValidateExecutionPlan",
+      "meta": {
+        "title": "Build execution plan"
+      }
+    },
+    {
+      "id": "Service_ValidateExecutionPlan",
+      "in": {
+        "plan": "$executionPlan",
+        "manifest": "$moduleManifest",
+        "deps": "$dependencyGraph"
+      },
+      "out": {
+        "$planValidation": "_result",
+        "/Process/Run/ExecutionPlan-Validation.json": "_result"
+      },
+      "next": "Branch_PlanReady",
+      "meta": {
+        "title": "Plan validation"
+      }
+    },
+    {
+      "id": "Branch_PlanReady",
+      "cases": [
+        ["$planValidation.success == true", "Set_PlanReady"],
+        ["ELSE", "Stop_SpecFailed"]
+      ],
+      "next": "RETURN",
+      "meta": {
+        "title": "Plan ready gate"
+      }
+    },
+    {
+      "id": "Set_PlanReady",
+      "target": "$runState.phase",
+      "value": "\"plan_valid\"",
+      "next": "RETURN",
+      "meta": {
+        "title": "Plan ready mark"
+      }
+    },
+    {
+      "id": "Set_GenerationStart",
+      "target": "$runState.phase",
+      "value": "\"generation\"",
+      "children": [
+        "LLM_GenDatabase",
+        "LLM_GenTheme",
+        "Loop_GenServiceDomains",
+        "Loop_GenComponents",
+        "Loop_GenSections",
+        "Loop_GenApps"
+      ],
+      "next": "Service_ValidateGeneratedCode",
+      "meta": {
+        "title": "Generation fanout"
+      }
+    },
+    {
+      "id": "LLM_GenDatabase",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate VL .vdb source only."
+          },
+          {
+            "role": "user",
+            "content": "DomainSchema: $domainSchema\nManifest database file: $moduleManifest.databaseFile"
+          }
+        ]
+      },
+      "out": {
+        "$vdbCode": "_result"
+      },
+      "next": "Write_DatabaseFile",
+      "meta": {
+        "title": "Generate .vdb"
+      }
+    },
+    {
+      "id": "Write_DatabaseFile",
+      "mode": "overwrite",
+      "target": "\"/\" + $moduleManifest.databaseFile.path",
+      "value": "$vdbCode",
+      "next": "RETURN",
+      "meta": {
+        "title": "Write .vdb"
+      }
+    },
+    {
+      "id": "LLM_GenTheme",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate VL .vth source only. Use Theme/Theme-Default.vth unless manifest defines another path."
+          },
+          {
+            "role": "user",
+            "content": "IntentSpec: $intentSpec\nUIContractMap: $uiContractMap\nManifest theme file: $moduleManifest.themeFile"
+          }
+        ]
+      },
+      "out": {
+        "$vthCode": "_result"
+      },
+      "next": "Write_ThemeFile",
+      "meta": {
+        "title": "Generate .vth"
+      }
+    },
+    {
+      "id": "Write_ThemeFile",
+      "mode": "overwrite",
+      "target": "\"/\" + $moduleManifest.themeFile.path",
+      "value": "$vthCode",
+      "next": "RETURN",
+      "meta": {
+        "title": "Write .vth"
+      }
+    },
+    {
+      "id": "Loop_GenServiceDomains",
+      "mode": "parallel",
+      "source": "$moduleManifest.serviceFiles",
+      "children": ["LLM_GenServiceDomainFile"],
+      "next": "RETURN",
+      "meta": {
+        "title": "Generate all .vs in parallel"
+      }
+    },
+    {
+      "id": "LLM_GenServiceDomainFile",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate VL .vs source only for one service domain file."
+          },
+          {
+            "role": "user",
+            "content": "Target file: _item\nServiceContractMap: $serviceContractMap\nDomainSchema: $domainSchema\nQuality gates: $qualityGateSpec"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.path}": "_result",
+        "$serviceGenResults[_index].path": "_item.path",
+        "$serviceGenResults[_index].status": "\"done\""
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-600 .vs"
+      }
+    },
+    {
+      "id": "Loop_GenComponents",
+      "mode": "parallel",
+      "source": "$moduleManifest.componentFiles",
+      "children": ["LLM_GenComponentFile"],
+      "next": "RETURN",
+      "meta": {
+        "title": "Generate all .cp in parallel"
+      }
+    },
+    {
+      "id": "LLM_GenComponentFile",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate VL .cp source only. Pure UI only, no service calls."
+          },
+          {
+            "role": "user",
+            "content": "Target file: _item\nUIContractMap components: $uiContractMap.components\nTheme constraints from IntentSpec: $intentSpec"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.path}": "_result",
+        "$componentGenResults[_index].path": "_item.path",
+        "$componentGenResults[_index].status": "\"done\""
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-500 .cp"
+      }
+    },
+    {
+      "id": "Loop_GenSections",
+      "mode": "parallel",
+      "source": "$moduleManifest.sectionFiles",
+      "children": ["LLM_GenSectionFile"],
+      "next": "RETURN",
+      "meta": {
+        "title": "Generate all .sc in parallel"
+      }
+    },
+    {
+      "id": "LLM_GenSectionFile",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate VL .sc source only. Section handles business logic and service calls; keep proper section order."
+          },
+          {
+            "role": "user",
+            "content": "Target file: _item\nUIContractMap sections: $uiContractMap.sections\nServiceContractMap: $serviceContractMap\nDependencyGraph: $dependencyGraph"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.path}": "_result",
+        "$sectionGenResults[_index].path": "_item.path",
+        "$sectionGenResults[_index].status": "\"done\""
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-700 .sc"
+      }
+    },
+    {
+      "id": "Loop_GenApps",
+      "mode": "parallel",
+      "source": "$moduleManifest.appFiles",
+      "children": ["LLM_GenAppFile"],
+      "next": "RETURN",
+      "meta": {
+        "title": "Generate all .vx in parallel"
+      }
+    },
+    {
+      "id": "LLM_GenAppFile",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate VL .vx source only. App controls routing, section orchestration, and app-level state/event wiring."
+          },
+          {
+            "role": "user",
+            "content": "Target file: _item\nUIContractMap apps: $uiContractMap.apps\nDependencyGraph: $dependencyGraph"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.path}": "_result",
+        "$appGenResults[_index].path": "_item.path",
+        "$appGenResults[_index].status": "\"done\""
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Agent-800 .vx"
+      }
+    },
+    {
+      "id": "Service_ValidateGeneratedCode",
+      "in": {
+        "manifest": "$moduleManifest",
+        "quality": "$qualityGateSpec",
+        "strict": true
+      },
+      "out": {
+        "$codeValidation": "_result",
+        "/Process/Run/CodeValidation-R1.json": "_result",
+        "$runState.phase": "\"validation_r1\""
+      },
+      "next": "Branch_CodeValidationRound1",
+      "meta": {
+        "title": "Validate generated VL"
+      }
+    },
+    {
+      "id": "Branch_CodeValidationRound1",
+      "cases": [
+        ["$codeValidation.success == true", "Set_CodeRound1Pass"],
+        ["ELSE", "LLM_BuildRepairPlan"]
+      ],
+      "next": "Service_ValidateGeneratedCodeFinal",
+      "meta": {
+        "title": "Repair decision"
+      }
+    },
+    {
+      "id": "Set_CodeRound1Pass",
+      "target": "$runState.phase",
+      "value": "\"validation_r1_pass\"",
+      "next": "RETURN",
+      "meta": {
+        "title": "No repair needed"
+      }
+    },
+    {
+      "id": "LLM_BuildRepairPlan",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "11", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Generate a repair plan JSON object with key tasks. Each task must include path, fileType, failureReason, and minimal context."
+          },
+          {
+            "role": "user",
+            "content": "Validation result: $codeValidation\nManifest: $moduleManifest\nDependencyGraph: $dependencyGraph\nContracts: service=$serviceContractMap ui=$uiContractMap"
+          }
+        ]
+      },
+      "out": {
+        "$repairPlan": "_result",
+        "/Process/Run/RepairPlan.json": "_result",
+        "$runState.phase": "\"repair\""
+      },
+      "next": "Loop_RepairFiles",
+      "meta": {
+        "title": "Build targeted repair plan"
+      }
+    },
+    {
+      "id": "Loop_RepairFiles",
+      "mode": "parallel",
+      "source": "$repairPlan.tasks",
+      "children": ["LLM_RepairVLFile"],
+      "next": "RETURN",
+      "meta": {
+        "title": "Patch failed files in parallel"
+      }
+    },
+    {
+      "id": "LLM_RepairVLFile",
+      "in": {
+        "model": "gpt-4.1",
+        "stream": true,
+        "docs": ["10", "12"],
+        "messages": [
+          {
+            "role": "system",
+            "content": "Regenerate one VL file in patch mode using provided reason and contracts. Output VL source only."
+          },
+          {
+            "role": "user",
+            "content": "Repair task: _item\nServiceContractMap: $serviceContractMap\nUIContractMap: $uiContractMap\nDomainSchema: $domainSchema\nQualityGateSpec: $qualityGateSpec"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.path}": "_result",
+        "$repairResults[_index].path": "_item.path",
+        "$repairResults[_index].status": "\"patched\""
+      },
+      "next": "RETURN",
+      "meta": {
+        "title": "Patch one file"
+      }
+    },
+    {
+      "id": "Service_ValidateGeneratedCodeFinal",
+      "in": {
+        "manifest": "$moduleManifest",
+        "quality": "$qualityGateSpec",
+        "strict": true
+      },
+      "out": {
+        "$codeValidationFinal": "_result",
+        "/Process/Run/CodeValidation-Final.json": "_result",
+        "$runState.phase": "\"final_validation\""
+      },
+      "next": "Branch_FinalOutcome",
+      "meta": {
+        "title": "Final code validation"
+      }
+    },
+    {
+      "id": "Branch_FinalOutcome",
+      "cases": [
+        ["$codeValidationFinal.success == true", "Set_FinalPass"],
+        ["ELSE", "Set_FinalFail"]
+      ],
+      "next": "Write_RunState_Final",
+      "meta": {
+        "title": "Set final state"
+      }
+    },
+    {
+      "id": "Set_FinalPass",
+      "target": "$finalReport.status",
+      "value": "\"success\"",
+      "next": "RETURN",
+      "meta": {
+        "title": "Final pass"
+      }
+    },
+    {
+      "id": "Set_FinalFail",
+      "target": "$finalReport.status",
+      "value": "\"failed\"",
+      "next": "RETURN",
+      "meta": {
+        "title": "Final fail"
+      }
+    },
+    {
+      "id": "Write_RunState_Final",
+      "mode": "overwrite",
+      "target": "\"/Process/Run/RunState.json\"",
+      "value": "$runState",
+      "next": "Branch_StopSelector",
+      "meta": {
+        "title": "Persist final RunState"
+      }
+    },
+    {
+      "id": "Branch_StopSelector",
+      "cases": [
+        ["$finalReport.status == \"success\"", "Stop_Success"],
+        ["ELSE", "Stop_Failed"]
+      ],
+      "next": "Stop_Failed",
+      "meta": {
+        "title": "Select final stop"
+      }
+    },
+    {
+      "id": "Stop_Success",
+      "meta": {
+        "title": "Workflow completed successfully"
+      }
+    },
+    {
+      "id": "Stop_Failed",
+      "meta": {
+        "title": "Workflow completed with failures"
+      }
+    },
+    {
+      "id": "Stop_SpecFailed",
+      "meta": {
+        "title": "Workflow aborted due to invalid specs/plan"
+      }
+    }
+  ]
+}

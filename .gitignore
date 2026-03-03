@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# VL-Code project data (user-specific)
+.vl-code/sessions/
+.vl-code/memory/
+.vl-code/last-compile.json
+.vl-code/project.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+__vl_deploy.zip
+*.vsix
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*

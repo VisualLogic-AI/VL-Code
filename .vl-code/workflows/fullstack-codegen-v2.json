@@ -1,0 +1,721 @@
+{
+  "version": "3.13",
+  "name": "FullStack-CodeGen-V2",
+  "description": "Process-first full-stack code generation workflow. Enforces: PRD → DB+ServiceMap → UIMap → ProjectMeta → (Theme+Components+Services) → Sections → Apps → Validate → Repair",
+  "registry": {
+    "params": [
+      "userRequest(STRING)",
+      "targetLang(STRING)"
+    ],
+    "services": [
+      "ValidateVLProject(manifest(OBJECT), strict(BOOL)) RETURN success(BOOL), errors([STRING]), warnings([STRING]), failedFiles([STRING])"
+    ],
+    "apis": [],
+    "components": [],
+    "vars": [
+      "$prdJson(OBJECT)",
+      "$prdJsonStr(STRING)",
+      "$vdbContent(STRING)",
+      "$vthContent(STRING)",
+      "$serviceMapJson(OBJECT)",
+      "$serviceMapJsonStr(STRING)",
+      "$uiMapJson(OBJECT)",
+      "$uiMapJsonStr(STRING)",
+      "$projectMeta(OBJECT)",
+      "$projectMetaStr(STRING)",
+      "$runState(OBJECT)",
+      "$codeValidation(OBJECT)",
+      "$repairPlan(OBJECT)"
+    ],
+    "files": {
+      "inputs": [
+        "Process/Input/*"
+      ],
+      "artifacts": [
+        "Process/PRD.json",
+        "Process/ServiceMap.json",
+        "Process/UIMap.json",
+        ".vl-code/ProjectMeta.json",
+        "Database/*",
+        "Theme/*",
+        "Services/*",
+        "ExtComponents/*",
+        "Sections/*",
+        "Apps/*"
+      ]
+    },
+    "docs": {
+      "1": "VL 2.91 Syntax Rules & File System Constraints",
+      "10": "Agent-100-PRD: Structured requirement analysis → PRD.json",
+      "20": "Agent-200-DB: Database schema generation from PRD → .vdb",
+      "30": "Agent-300-ServiceMap: Backend service contracts from PRD+VDB → ServiceMap.json",
+      "40": "Agent-400-UIMap: Frontend architecture from PRD+ServiceMap → UIMap.json",
+      "45": "Agent-450-ProjectMeta: Extract unified ProjectMeta from PRD+ServiceMap+UIMap",
+      "50": "Agent-500-Theme: Theme tokens generation → .vth",
+      "60": "Agent-600-Component: Pure UI component generation → .cp",
+      "70": "Agent-700-ServiceDomain: Service domain implementation → .vs",
+      "80": "Agent-800-Section: Section business logic + UI → .sc",
+      "90": "Agent-900-App: App entry + routing → .vx",
+      "95": "Agent-950-Repair: Targeted repair for failed VL files"
+    }
+  },
+  "steps": [
+    {
+      "id": "Set_Init",
+      "meta": {
+        "title": "⚡ Initialize workflow state"
+      },
+      "target": "$runState",
+      "value": "{\"phase\":\"init\",\"status\":\"running\",\"startedAt\":\"NOW()\"}",
+      "next": "LLM_100_PRD"
+    },
+    {
+      "id": "LLM_100_PRD",
+      "meta": {
+        "title": "📋 Agent-1 · PRD Structured Requirement Analysis"
+      },
+      "in": {
+        "docs": [
+          "1",
+          "10"
+        ],
+        "max_tokens": 12000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "User Requirement:"
+          },
+          {
+            "role": "user",
+            "content": "=userRequest"
+          },
+          {
+            "role": "user",
+            "content": "Target Language:"
+          },
+          {
+            "role": "user",
+            "content": "=targetLang"
+          }
+        ],
+        "output_config": {
+          "format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "out": {
+        "$prdJson": "=_result",
+        "$prdJsonStr": "=_result + ''",
+        "/Process/PRD.json": "=_result"
+      },
+      "next": "Set_Phase2_Parallel"
+    },
+    {
+      "id": "Set_Phase2_Parallel",
+      "meta": {
+        "title": "🔀 Phase 2 · DB + ServiceMap in parallel"
+      },
+      "children": [
+        "LLM_200_DB",
+        "LLM_300_ServiceMap"
+      ],
+      "next": "LLM_400_UIMap"
+    },
+    {
+      "id": "LLM_200_DB",
+      "meta": {
+        "title": "🗄️ Agent-2 · Database Schema (.vdb)"
+      },
+      "in": {
+        "stream": true,
+        "docs": [
+          "1",
+          "20"
+        ],
+        "max_tokens": 16000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "PRD:"
+          },
+          {
+            "role": "user",
+            "content": "=$prdJsonStr"
+          }
+        ]
+      },
+      "out": {
+        "$vdbContent": "=_result",
+        "/Database/{$prdJson.projectName}.vdb": "=_result"
+      }
+    },
+    {
+      "id": "LLM_300_ServiceMap",
+      "meta": {
+        "title": "⚙️ Agent-3 · ServiceMap Backend Contracts"
+      },
+      "in": {
+        "docs": [
+          "1",
+          "30"
+        ],
+        "max_tokens": 12000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "PRD:"
+          },
+          {
+            "role": "user",
+            "content": "=$prdJsonStr"
+          }
+        ],
+        "output_config": {
+          "format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "out": {
+        "$serviceMapJson": "=_result",
+        "$serviceMapJsonStr": "=_result + ''",
+        "/Process/ServiceMap.json": "=_result"
+      }
+    },
+    {
+      "id": "LLM_400_UIMap",
+      "meta": {
+        "title": "🎨 Agent-4 · UIMap Frontend Architecture"
+      },
+      "in": {
+        "docs": [
+          "1",
+          "40"
+        ],
+        "max_tokens": 16000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "PRD:"
+          },
+          {
+            "role": "user",
+            "content": "=$prdJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "ServiceMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$serviceMapJsonStr"
+          }
+        ],
+        "output_config": {
+          "format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "out": {
+        "$uiMapJson": "=_result",
+        "$uiMapJsonStr": "=_result + ''",
+        "/Process/UIMap.json": "=_result"
+      },
+      "next": "LLM_450_ProjectMeta"
+    },
+    {
+      "id": "LLM_450_ProjectMeta",
+      "meta": {
+        "title": "📌 Agent-4.5 · ProjectMeta — Single Source of Truth"
+      },
+      "in": {
+        "docs": [
+          "1",
+          "45"
+        ],
+        "max_tokens": 16000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "PRD:"
+          },
+          {
+            "role": "user",
+            "content": "=$prdJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "ServiceMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$serviceMapJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "UIMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$uiMapJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "VDB:"
+          },
+          {
+            "role": "user",
+            "content": "=$vdbContent"
+          }
+        ],
+        "output_config": {
+          "format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "out": {
+        "$projectMeta": "=_result",
+        "$projectMetaStr": "=_result + ''",
+        "/.vl-code/ProjectMeta.json": "=_result"
+      },
+      "next": "Set_Phase5_Parallel"
+    },
+    {
+      "id": "Set_Phase5_Parallel",
+      "meta": {
+        "title": "🔀 Phase 5 · Theme + Components + Services (parallel)"
+      },
+      "children": [
+        "LLM_500_Theme",
+        "Loop_600_Components",
+        "Loop_700_ServiceDomains"
+      ],
+      "next": "Loop_800_Sections"
+    },
+    {
+      "id": "LLM_500_Theme",
+      "meta": {
+        "title": "🎨 Agent-5 · Theme Tokens (.vth)"
+      },
+      "in": {
+        "stream": true,
+        "docs": [
+          "1",
+          "50"
+        ],
+        "max_tokens": 8000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "ProjectMeta:"
+          },
+          {
+            "role": "user",
+            "content": "=$projectMetaStr"
+          },
+          {
+            "role": "user",
+            "content": "PRD:"
+          },
+          {
+            "role": "user",
+            "content": "=$prdJsonStr"
+          }
+        ]
+      },
+      "out": {
+        "$vthContent": "=_result",
+        "/Theme/{$prdJson.projectName}.vth": "=_result"
+      }
+    },
+    {
+      "id": "Loop_600_Components",
+      "meta": {
+        "title": "🧩 Phase 5b · Component Generation (.cp)"
+      },
+      "source": "=$projectMeta.components",
+      "mode": "parallel",
+      "children": [
+        "LLM_600_Component"
+      ]
+    },
+    {
+      "id": "LLM_600_Component",
+      "meta": {
+        "title": "🧩 Agent-6 · Single .cp Component"
+      },
+      "in": {
+        "stream": true,
+        "docs": [
+          "1",
+          "60"
+        ],
+        "max_tokens": 8000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "ComponentSpec:"
+          },
+          {
+            "role": "user",
+            "content": "=_item + ''"
+          },
+          {
+            "role": "user",
+            "content": "UIMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$uiMapJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "ProjectMeta:"
+          },
+          {
+            "role": "user",
+            "content": "=$projectMetaStr"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.filePath}": "=_result"
+      },
+      "next": "RETURN"
+    },
+    {
+      "id": "Loop_700_ServiceDomains",
+      "meta": {
+        "title": "⚙️ Phase 5c · Service Domain Generation (.vs)"
+      },
+      "source": "=$projectMeta.services",
+      "mode": "parallel",
+      "children": [
+        "LLM_700_ServiceDomain"
+      ]
+    },
+    {
+      "id": "LLM_700_ServiceDomain",
+      "meta": {
+        "title": "⚙️ Agent-7 · Single .vs Service Domain"
+      },
+      "in": {
+        "stream": true,
+        "docs": [
+          "1",
+          "70"
+        ],
+        "max_tokens": 16000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "DomainSpec:"
+          },
+          {
+            "role": "user",
+            "content": "=_item + ''"
+          },
+          {
+            "role": "user",
+            "content": "ServiceMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$serviceMapJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "VDB:"
+          },
+          {
+            "role": "user",
+            "content": "=$vdbContent"
+          },
+          {
+            "role": "user",
+            "content": "ProjectMeta:"
+          },
+          {
+            "role": "user",
+            "content": "=$projectMetaStr"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.filePath}": "=_result"
+      },
+      "next": "RETURN"
+    },
+    {
+      "id": "Loop_800_Sections",
+      "meta": {
+        "title": "📄 Phase 6 · Section Generation (.sc)"
+      },
+      "source": "=$projectMeta.sections",
+      "mode": "parallel",
+      "children": [
+        "LLM_800_Section"
+      ],
+      "next": "Loop_900_Apps"
+    },
+    {
+      "id": "LLM_800_Section",
+      "meta": {
+        "title": "📄 Agent-8 · Single .sc Section"
+      },
+      "in": {
+        "stream": true,
+        "docs": [
+          "1",
+          "80"
+        ],
+        "max_tokens": 16000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "SectionSpec:"
+          },
+          {
+            "role": "user",
+            "content": "=_item + ''"
+          },
+          {
+            "role": "user",
+            "content": "UIMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$uiMapJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "ServiceMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$serviceMapJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "ProjectMeta:"
+          },
+          {
+            "role": "user",
+            "content": "=$projectMetaStr"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.filePath}": "=_result"
+      },
+      "next": "RETURN"
+    },
+    {
+      "id": "Loop_900_Apps",
+      "meta": {
+        "title": "📱 Phase 7 · App Entry Generation (.vx)"
+      },
+      "source": "=$projectMeta.apps",
+      "mode": "parallel",
+      "children": [
+        "LLM_900_App"
+      ],
+      "next": "Service_Validate"
+    },
+    {
+      "id": "LLM_900_App",
+      "meta": {
+        "title": "📱 Agent-9 · Single .vx App Entry"
+      },
+      "in": {
+        "stream": true,
+        "docs": [
+          "1",
+          "90"
+        ],
+        "max_tokens": 8000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "AppSpec:"
+          },
+          {
+            "role": "user",
+            "content": "=_item + ''"
+          },
+          {
+            "role": "user",
+            "content": "UIMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$uiMapJsonStr"
+          },
+          {
+            "role": "user",
+            "content": "ProjectMeta:"
+          },
+          {
+            "role": "user",
+            "content": "=$projectMetaStr"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.filePath}": "=_result"
+      },
+      "next": "RETURN"
+    },
+    {
+      "id": "Service_Validate",
+      "meta": {
+        "title": "✅ Validate all generated VL files"
+      },
+      "in": {
+        "manifest": "$projectMeta",
+        "strict": true
+      },
+      "out": {
+        "$codeValidation": "=_result",
+        "$runState.phase": "\"validation\""
+      },
+      "next": "Branch_ValidationGate"
+    },
+    {
+      "id": "Branch_ValidationGate",
+      "meta": {
+        "title": "🚦 Validation gate"
+      },
+      "cases": [
+        [
+          "$codeValidation.success == true",
+          "Stop_Success"
+        ],
+        [
+          "ELSE",
+          "LLM_950_RepairPlan"
+        ]
+      ],
+      "next": "Loop_960_Repair"
+    },
+    {
+      "id": "LLM_950_RepairPlan",
+      "meta": {
+        "title": "🔧 Build repair plan for failed files"
+      },
+      "in": {
+        "docs": [
+          "1",
+          "95"
+        ],
+        "max_tokens": 8000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "Validation errors:"
+          },
+          {
+            "role": "user",
+            "content": "=$codeValidation.errors + ''"
+          },
+          {
+            "role": "user",
+            "content": "Failed files:"
+          },
+          {
+            "role": "user",
+            "content": "=$codeValidation.failedFiles + ''"
+          },
+          {
+            "role": "user",
+            "content": "ProjectMeta:"
+          },
+          {
+            "role": "user",
+            "content": "=$projectMetaStr"
+          }
+        ],
+        "output_config": {
+          "format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "out": {
+        "$repairPlan": "=_result"
+      },
+      "next": "RETURN"
+    },
+    {
+      "id": "Loop_960_Repair",
+      "meta": {
+        "title": "🔧 Repair failed files in parallel"
+      },
+      "source": "=$repairPlan.tasks",
+      "mode": "parallel",
+      "children": [
+        "LLM_960_RepairFile"
+      ],
+      "next": "Stop_Repaired"
+    },
+    {
+      "id": "LLM_960_RepairFile",
+      "meta": {
+        "title": "🔧 Repair single VL file"
+      },
+      "in": {
+        "stream": true,
+        "docs": [
+          "1",
+          "95"
+        ],
+        "max_tokens": 16000,
+        "messages": [
+          {
+            "role": "user",
+            "content": "Repair task:"
+          },
+          {
+            "role": "user",
+            "content": "=_item + ''"
+          },
+          {
+            "role": "user",
+            "content": "ProjectMeta:"
+          },
+          {
+            "role": "user",
+            "content": "=$projectMetaStr"
+          },
+          {
+            "role": "user",
+            "content": "ServiceMap:"
+          },
+          {
+            "role": "user",
+            "content": "=$serviceMapJsonStr"
+          }
+        ]
+      },
+      "out": {
+        "/{_item.path}": "=_result"
+      },
+      "next": "RETURN"
+    },
+    {
+      "id": "Stop_Success",
+      "meta": {
+        "title": "✅ All files validated — generation complete"
+      }
+    },
+    {
+      "id": "Stop_Repaired",
+      "meta": {
+        "title": "🔧 Repair pass complete — re-run validation recommended"
+      }
+    }
+  ]
+}
